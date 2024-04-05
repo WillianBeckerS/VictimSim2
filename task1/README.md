@@ -1,8 +1,9 @@
 # TASK 1: Inteligent Systems
+
 Students:
-  David Luiz Becker de Souza <br>
-  Thiago Medeiros <br>
-  Willian Becker de Souza
+- David Luiz Becker de Souza
+- Thiago Medeiros
+- Willian Becker de Souza
 
 Requirements:
 - Implement at least one AI algorithm (seen in the classroom) for search
