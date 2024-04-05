@@ -1,5 +1,19 @@
-# EXAMPLE 02: Random explorer and a DFS rescuer
-This example features an explorer agent that walks randomly in the environment. It constructs a map of the explored region containing the obstacles and victims. The explorer then passes the map to the rescuer. Subsequently, the rescuer walks using the depth-first search within the discovered region, attempting to rescue the found victims.
+# TASK 1: Inteligent Systems
+Students:
+  David Luiz Becker de Souza
+  Thiago Medeiros
+  Willian Becker de Souza
+
+Requirements:
+- Implement at least one AI algorithm (seen in the classroom) for search
+exploratory;
+- Implement at least one AI algorithm (seen in the classroom) for clustering
+victims; the clusters produced must be saved in cluster1.txt text files...
+clustern.txt (one for each cluster) in CSV format containing 𝑖𝑑, 𝑥, 𝑦, 0.0, 1 (id is the
+identification of the victim, x and y, her position and the last two values ​​correspond to the
+gravity value and its label)
+- Assign groups of victims to rescue agents freely;
+- Build and unify individual maps freely.
 
 How to use:
 - copy the explorer.py, rescuer.py, and main.py to some folder
