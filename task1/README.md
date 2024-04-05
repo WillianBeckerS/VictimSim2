@@ -1,7 +1,7 @@
 # TASK 1: Inteligent Systems
 Students:
-  David Luiz Becker de Souza
-  Thiago Medeiros
+  David Luiz Becker de Souza <br>
+  Thiago Medeiros <br>
   Willian Becker de Souza
 
 Requirements:
