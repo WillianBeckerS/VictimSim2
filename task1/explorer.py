@@ -45,7 +45,11 @@ class Explorer(AbstAgent):
         self.victims = {}          # a dictionary of found victims: (seq): ((x,y), [<vs>])
                                    # the key is the seq number of the victim,(x,y) the position, <vs> the list of vital signals
 
-        # put the current position - the base - in the map
+        self.results = {}   # a dictionary of movement results: (i, j): (AC_INCR[n]: (l, c)), where 0 <= n <= 7
+        self.untried = {} # a dictionary for untried movements
+        self.unbacktracked = {} # a dictionary for saving unbacktracking
+        
+        # Put the current position - the base - in the map
         self.map.add((self.x, self.y), 1, VS.NO_VICTIM, self.check_walls_and_lim())
 
     def get_next_position(self):
@@ -63,9 +67,46 @@ class Explorer(AbstAgent):
             if obstacles[direction] == VS.CLEAR:
                 return Explorer.AC_INCR[direction]
         
+    
+    def online_dfs(self):
+        """ Implements Online DFS to explore the environment
+        """
+
+        # Check the neighborhood walls and grid limits
+        obstacles = self.check_walls_and_lim()
+
+        # A randomic sequence for moving
+        if (self.x, self.y) not in self.untried:
+            self.untried[(self.x, self.y)] = list(range(8))
+            random.shuffle(self.untried[(self.x, self.y)])
+
+        # Loop while untried list is not empty
+        while self.untried[(self.x, self.y)]:
+            # Next movement
+            dx, dy = Explorer.AC_INCR[self.untried[(self.x, self.y)][0]]
+            # If colide with a wall or reached the grid limit
+            if obstacles[self.untried[(self.x, self.y)][0]] == VS.WALL or obstacles[self.untried[(self.x, self.y)][0]] == VS.END:
+                # Save the movement result
+                self.results[(self.x, self.y)] = {(Explorer.AC_INCR[self.untried[(self.x, self.y)][0]]): (self.x, self.y)}
+                # Remove from untried list
+                self.untried[(self.x, self.y)].pop(0)
+            # Check if the corresponding position in walls_and_lim is CLEAR
+            elif obstacles[self.untried[(self.x, self.y)][0]] == VS.CLEAR:
+                # Save the movement result
+                self.results[(self.x, self.y)] = {(Explorer.AC_INCR[self.untried[(self.x, self.y)][0]]): (self.x + dx, self.y + dy)}
+                if (self.x, self.y) not in self.unbacktracked:
+                    self.unbacktracked[(self.x, self.y)] = []
+                    # Save the movement in the unbacktracked dictionary
+                self.unbacktracked[(self.x, self.y)].append((self.x + dx, self.y + dy))
+                return Explorer.AC_INCR[self.untried[(self.x, self.y)].pop(0)]
+                
+        # Check if all movements was already tried
+        if not self.untried[(self.x, self.y)]:
+            return self.unbacktracked[(self.x, self.y)].pop(0)
+
     def explore(self):
         # get an random increment for x and y       
-        dx, dy = self.get_next_position()
+        dx, dy = self.online_dfs()
 
         # Moves the body to another position
         rtime_bef = self.get_rtime()
@@ -145,4 +186,3 @@ class Explorer(AbstAgent):
 
         self.come_back()
         return True
-
