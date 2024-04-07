@@ -13,7 +13,6 @@ def main(data_folder_name):
     current_folder = os.path.abspath(os.getcwd())
     data_folder = os.path.abspath(os.path.join(current_folder, data_folder_name))
 
-    
     # Instantiate the environment
     env = Env(data_folder)
     
@@ -26,8 +25,10 @@ def main(data_folder_name):
 
     # Explorer needs to know rescuer to send the map
     # that's why rescuer is instatiated before
-    exp = Explorer(env, explorer_file, resc)
-
+    exp1 = Explorer(env, explorer_file, resc)
+    exp2 = Explorer(env, explorer_file, resc)
+    exp3 = Explorer(env, explorer_file, resc)
+    print("INSTANCIAS:"+str(Explorer.contador_instancias))
     # Run the environment simulator
     env.run()
     
@@ -39,6 +40,6 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         data_folder_name = sys.argv[1]
     else:
-        data_folder_name = os.path.join("datasets", "data_10v_12x12")
+        data_folder_name = os.path.join("datasets", "data_10v_12X12")
         
     main(data_folder_name)

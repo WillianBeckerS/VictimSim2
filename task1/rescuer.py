@@ -7,6 +7,7 @@
 
 import os
 import random
+import math
 from map import Map
 from vs.abstract_agent import AbstAgent
 from vs.physical_agent import PhysAgent
@@ -14,17 +15,14 @@ from vs.constants import VS
 from abc import ABC, abstractmethod
 
 class Centroid:
-	def _init_(self, posX, posY):
-		self.posX = posX
+    def _init_(self, posX, posY):
+        self.posX = posX
         self.posY = posY
 
 class Cluster:
-
-	def _init_(self, posX, posY):
+    def _init_(self, posX, posY):
         self.centroid = Centroid(posX, posY)
-        self.victims = []
-
-
+        self.victims = {} # a dictionary of found victims: (seq): ((x,y), [<vs>])
 
 ## Classe que define o Agente Rescuer com um plano fixo
 class Rescuer(AbstAgent):
@@ -47,7 +45,10 @@ class Rescuer(AbstAgent):
         self.x = 0                  # the current x position of the rescuer when executing the plan
         self.y = 0                  # the current y position of the rescuer when executing the plan
         self.clusters = []    # list of clusters
-                
+
+        self.width = env.dic["GRID_WIDTH"]
+        self.height = env.dic["GRID_HEIGHT"]
+
         # Starts in IDLE state.
         # It changes to ACTIVE when the map arrives
         self.set_state(VS.IDLE)
@@ -230,46 +231,46 @@ class Rescuer(AbstAgent):
         return True
 
     def make_groups_victims(self, map, victims):
-		max_X = env.dic["GRID_WIDTH"]
-        max_Y = env.dic["GRID_HEIGHT"]
+        max_X = self.width
+        max_Y = self.height
 
-		for i in range(4):
-		    self.clusters.add(Cluster(random.randint(1, max_X), random.randint(1, max_Y)))
+        for i in range(4):
+            self.clusters.append(Cluster(random.randint(1, max_X), random.randint(1, max_Y)))
 
-		changedClusterPosition = True
+        changedClusterPosition = True
 		
-		iters = 1
-		MAX_ITERATIONS = 50
-		while changedClusterPosition and iters < MAX_ITERATIONS:
+        iters = 1
+        MAX_ITERATIONS = 50
+        while changedClusterPosition and iters < MAX_ITERATIONS:
 
-			for i in self.victims:
-				dist = float('inf')
-				for j, elem in enumerate(self.clusters):
-					aux = math.pow(i.posX - elem.centroid.posX, 2) + math.pow(i.posY - elem.centroid.posY, 2)
-					if aux < dist:
-						dist = aux
-						clusterIndex = j
-				self.clusters[clusterIndex].victims.add(i)
+            for i in self.victims:
+                dist = float('inf')
+                for j, elem in enumerate(self.clusters):
+                    aux = math.pow(i.posX - elem.centroid.posX, 2) + math.pow(i.posY - elem.centroid.posY, 2)
+                    if aux < dist:
+                        dist = aux
+                        clusterIndex = j
+                self.clusters[clusterIndex].victims.add(i)
 
-			for i in self.clusters:
-				sumX = 0
-				sumY = 0
-				auxCentroid = Centroid(i.centroid.posX, i.centroid.posY)
-				for j in i.victims:
-					sumX = sumX + j.posX
-					sumY = sumY + j.posY
-				i.centroid.posX = sumX/len(i.victims)
-				i.centroid.posY = sumY/len(i.victims)
-				if auxCentroid == i.centroid:
-					changedClusterPosition = False
-			iters++
+            for i in self.clusters:
+                sumX = 0
+                sumY = 0
+                auxCentroid = Centroid(i.centroid.posX, i.centroid.posY)
+                for seq, ((x, y), vs) in i.victims.items():
+                    sumX = sumX + x
+                    sumY = sumY + y
+                i.centroid.posX = sumX/len(i.victims)
+                i.centroid.posY = sumY/len(i.victims)
+                if auxCentroid == i.centroid:
+                    changedClusterPosition = False
+            iters += 1
 
-		for i, elem in enumerate(self.clusters):
-			with open('cluster' + i + '.txt', 'w') as arquivo:
-				for j in elem.victims:
-			  		arquivo.write(j.id + "," + j.posX + "," + j.posY + "," + j.grav + "," + j.label "\n")
+        for i, elem in enumerate(self.clusters):
+            with open('cluster' + i + '.txt', 'w') as arquivo:
+                for seq, ((x, y), vs) in elem.victims.items():
+                    arquivo.write(seq + "," + str(x) + "," + str(y) + "," + vs + "," + "\n")
                             
-    def assign_groups_to_rescuers:
+    def assign_groups_to_rescuers(self):
         clustersCopy = self.clusters
         random.shuffle(clustersCopy)
 

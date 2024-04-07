@@ -20,6 +20,7 @@ How to use:
 - copy the explorer.py, rescuer.py, and main.py to some folder
 - all the accessory .py you create, you should put in the folder
 - copy the folder 'vs' to the folder
+- python3 main.py
 
 You should get this strutcture:
 * folder

@@ -28,20 +28,24 @@ class Stack:
         return len(self.items) == 0
 
 class Explorer(AbstAgent):
+    contador_instancias = 0
+    map = Map()
+
     def __init__(self, env, config_file, resc):
         """ Construtor do agente random on-line
         @param env: a reference to the environment 
         @param config_file: the absolute path to the explorer's config file
         @param resc: a reference to the rescuer agent to invoke when exploration finishes
         """
-
+        Explorer.contador_instancias += 1
         super().__init__(env, config_file)
+
         self.walk_stack = Stack()  # a stack to store the movements
         self.set_state(VS.ACTIVE)  # explorer is active since the begin
         self.resc = resc           # reference to the rescuer agent
         self.x = 0                 # current x position relative to the origin 0
         self.y = 0                 # current y position relative to the origin 0
-        self.map = Map()           # create a map for representing the environment
+        #self.map = Map()           # create a map for representing the environment
         self.victims = {}          # a dictionary of found victims: (seq): ((x,y), [<vs>])
                                    # the key is the seq number of the victim,(x,y) the position, <vs> the list of vital signals
 
@@ -50,7 +54,10 @@ class Explorer(AbstAgent):
         self.unbacktracked = {} # a dictionary for saving unbacktracking
         
         # Put the current position - the base - in the map
-        self.map.add((self.x, self.y), 1, VS.NO_VICTIM, self.check_walls_and_lim())
+        Explorer.map.add((self.x, self.y), 1, VS.NO_VICTIM, self.check_walls_and_lim())
+
+    def __del__(self):
+        Explorer.contador_instancias -= 1
 
     def get_next_position(self):
         """ Randomically, gets the next position that can be explored (no wall and inside the grid)
@@ -117,7 +124,7 @@ class Explorer(AbstAgent):
         # Should never bump, but for safe functionning let's test
         if result == VS.BUMPED:
             # update the map with the wall
-            self.map.add((self.x + dx, self.y + dy), VS.OBST_WALL, VS.NO_VICTIM, self.check_walls_and_lim())
+            Explorer.map.add((self.x + dx, self.y + dy), VS.OBST_WALL, VS.NO_VICTIM, self.check_walls_and_lim())
             #print(f"{self.NAME}: Wall or grid limit reached at ({self.x + dx}, {self.y + dy})")
 
         if result == VS.EXECUTED:
@@ -145,7 +152,7 @@ class Explorer(AbstAgent):
                 difficulty = difficulty / self.COST_DIAG
 
             # Update the map with the new cell
-            self.map.add((self.x, self.y), difficulty, seq, self.check_walls_and_lim())
+            Explorer.map.add((self.x, self.y), difficulty, seq, self.check_walls_and_lim())
             #print(f"{self.NAME}:at ({self.x}, {self.y}), diffic: {difficulty:.2f} vict: {seq} rtime: {self.get_rtime()}")
 
         return
@@ -180,8 +187,12 @@ class Explorer(AbstAgent):
             # time to wake up the rescuer
             # pass the walls and the victims (here, they're empty)
             print(f"{self.NAME}: rtime {self.get_rtime()}, invoking the rescuer")
+            print(f"{self.NAME}: rtime {self.get_rtime()}, instancias: " + str(Explorer.contador_instancias))
             #input(f"{self.NAME}: type [ENTER] to proceed")
-            self.resc.go_save_victims(self.map, self.victims)
+            Explorer.contador_instancias -= 1
+            if(Explorer.contador_instancias == 0):
+                self.resc.make_groups_victims(Explorer.map, self.victims)
+                self.resc.go_save_victims(Explorer.map, self.victims)
             return False
 
         self.come_back()
