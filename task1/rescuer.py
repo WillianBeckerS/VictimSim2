@@ -15,12 +15,12 @@ from vs.constants import VS
 from abc import ABC, abstractmethod
 
 class Centroid:
-    def _init_(self, posX, posY):
+    def __init__(self, posX, posY):
         self.posX = posX
         self.posY = posY
 
 class Cluster:
-    def _init_(self, posX, posY):
+    def __init__(self, posX, posY):
         self.centroid = Centroid(posX, posY)
         self.victims = {} # a dictionary of found victims: (seq): ((x,y), [<vs>])
 
@@ -235,7 +235,11 @@ class Rescuer(AbstAgent):
         max_Y = self.height
 
         for i in range(4):
-            self.clusters.append(Cluster(random.randint(1, max_X), random.randint(1, max_Y)))
+            x = random.randint(1, max_X)
+            y = random.randint(1, max_Y)
+            print("posicao cluster: " + str(x) + " " + str(y))
+            cluster = Cluster(x, y)
+            self.clusters.append(cluster)
 
         changedClusterPosition = True
 		
@@ -243,14 +247,14 @@ class Rescuer(AbstAgent):
         MAX_ITERATIONS = 50
         while changedClusterPosition and iters < MAX_ITERATIONS:
 
-            for i in self.victims:
+            for seq, ((x, y), vs) in victims.items():
                 dist = float('inf')
                 for j, elem in enumerate(self.clusters):
-                    aux = math.pow(i.posX - elem.centroid.posX, 2) + math.pow(i.posY - elem.centroid.posY, 2)
+                    aux = math.pow(x - elem.centroid.posX, 2) + math.pow(y - elem.centroid.posY, 2)
                     if aux < dist:
                         dist = aux
                         clusterIndex = j
-                self.clusters[clusterIndex].victims.add(i)
+                self.clusters[clusterIndex].victims[seq] = ((x, y), vs)
 
             for i in self.clusters:
                 sumX = 0
@@ -259,16 +263,19 @@ class Rescuer(AbstAgent):
                 for seq, ((x, y), vs) in i.victims.items():
                     sumX = sumX + x
                     sumY = sumY + y
-                i.centroid.posX = sumX/len(i.victims)
-                i.centroid.posY = sumY/len(i.victims)
-                if auxCentroid == i.centroid:
-                    changedClusterPosition = False
+
+                print("tamanho dic victims: " + str(len(i.victims)))
+                if(len(i.victims) != 0):                
+                    i.centroid.posX = sumX/len(i.victims)
+                    i.centroid.posY = sumY/len(i.victims)
+                    if auxCentroid == i.centroid:
+                        changedClusterPosition = False
             iters += 1
 
         for i, elem in enumerate(self.clusters):
-            with open('cluster' + i + '.txt', 'w') as arquivo:
+            with open('cluster' + str(i) + '.txt', 'w') as arquivo:
                 for seq, ((x, y), vs) in elem.victims.items():
-                    arquivo.write(seq + "," + str(x) + "," + str(y) + "," + vs + "," + "\n")
+                    arquivo.write(str(seq) + "," + str(x) + "," + str(y) + "," + str(vs[0]) + "," + str(vs[1]) + "," + str(vs[2]) + "," + str(vs[3]) + "," + str(vs[4]) + "," + str(vs[4]) + "\n")
                             
     def assign_groups_to_rescuers(self):
         clustersCopy = self.clusters

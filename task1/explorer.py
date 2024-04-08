@@ -29,6 +29,7 @@ class Stack:
 
 class Explorer(AbstAgent):
     contador_instancias = 0
+    victimsTotals = []
     map = Map()
 
     def __init__(self, env, config_file, resc):
@@ -191,8 +192,14 @@ class Explorer(AbstAgent):
             #input(f"{self.NAME}: type [ENTER] to proceed")
             Explorer.contador_instancias -= 1
             if(Explorer.contador_instancias == 0):
-                self.resc.make_groups_victims(Explorer.map, self.victims)
-                self.resc.go_save_victims(Explorer.map, self.victims)
+                Explorer.victimsTotals.append(self.victims)
+                victims = {}
+                for i in Explorer.victimsTotals:
+                    victims.update(i)
+                self.resc.make_groups_victims(Explorer.map, victims)
+                self.resc.go_save_victims(Explorer.map, victims)
+            else:
+                Explorer.victimsTotals.append(self.victims)
             return False
 
         self.come_back()
