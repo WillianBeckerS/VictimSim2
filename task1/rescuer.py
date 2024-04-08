@@ -250,7 +250,7 @@ class Rescuer(AbstAgent):
             for seq, ((x, y), vs) in victims.items():
                 dist = float('inf')
                 for j, elem in enumerate(self.clusters):
-                    aux = math.pow(x - elem.centroid.posX, 2) + math.pow(y - elem.centroid.posY, 2)
+                    aux = math.sqrt(math.pow(x - elem.centroid.posX, 2) + math.pow(y - elem.centroid.posY, 2))
                     if aux < dist:
                         dist = aux
                         clusterIndex = j
