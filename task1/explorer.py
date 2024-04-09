@@ -30,7 +30,7 @@ class Stack:
 class Explorer(AbstAgent):
     contador_instancias = 0
     victimsTotals = []
-    map = Map()
+    maps = []
 
     def __init__(self, env, config_file, resc):
         """ Construtor do agente random on-line
@@ -46,7 +46,7 @@ class Explorer(AbstAgent):
         self.resc = resc           # reference to the rescuer agent
         self.x = 0                 # current x position relative to the origin 0
         self.y = 0                 # current y position relative to the origin 0
-        #self.map = Map()           # create a map for representing the environment
+        self.map = Map()           # create a map for representing the environment
         self.victims = {}          # a dictionary of found victims: (seq): ((x,y), [<vs>])
                                    # the key is the seq number of the victim,(x,y) the position, <vs> the list of vital signals
 
@@ -55,7 +55,7 @@ class Explorer(AbstAgent):
         self.unbacktracked = {} # a dictionary for saving unbacktracking
         
         # Put the current position - the base - in the map
-        Explorer.map.add((self.x, self.y), 1, VS.NO_VICTIM, self.check_walls_and_lim())
+        self.map.add((self.x, self.y), 1, VS.NO_VICTIM, self.check_walls_and_lim())
 
     def __del__(self):
         Explorer.contador_instancias -= 1
@@ -125,7 +125,7 @@ class Explorer(AbstAgent):
         # Should never bump, but for safe functionning let's test
         if result == VS.BUMPED:
             # update the map with the wall
-            Explorer.map.add((self.x + dx, self.y + dy), VS.OBST_WALL, VS.NO_VICTIM, self.check_walls_and_lim())
+            self.map.add((self.x + dx, self.y + dy), VS.OBST_WALL, VS.NO_VICTIM, self.check_walls_and_lim())
             #print(f"{self.NAME}: Wall or grid limit reached at ({self.x + dx}, {self.y + dy})")
 
         if result == VS.EXECUTED:
@@ -153,7 +153,7 @@ class Explorer(AbstAgent):
                 difficulty = difficulty / self.COST_DIAG
 
             # Update the map with the new cell
-            Explorer.map.add((self.x, self.y), difficulty, seq, self.check_walls_and_lim())
+            self.map.add((self.x, self.y), difficulty, seq, self.check_walls_and_lim())
             #print(f"{self.NAME}:at ({self.x}, {self.y}), diffic: {difficulty:.2f} vict: {seq} rtime: {self.get_rtime()}")
 
         return
@@ -173,7 +173,14 @@ class Explorer(AbstAgent):
             self.x += dx
             self.y += dy
             #print(f"{self.NAME}: coming back at ({self.x}, {self.y}), rtime: {self.get_rtime()}")
-        
+
+    def joinMaps(self, maps):
+        joinedMap = Map()
+        for i in Explorer.maps:
+            joinedMap.map_data.update(i.map_data)
+
+        return joinedMap
+
     def deliberate(self) -> bool:
         """ The agent chooses the next action. The simulator calls this
         method at each cycle. Must be implemented in every agent"""
@@ -190,16 +197,18 @@ class Explorer(AbstAgent):
             print(f"{self.NAME}: rtime {self.get_rtime()}, invoking the rescuer")
             print(f"{self.NAME}: rtime {self.get_rtime()}, instancias: " + str(Explorer.contador_instancias))
             #input(f"{self.NAME}: type [ENTER] to proceed")
+            
+            Explorer.maps.append(self.map)
+            Explorer.victimsTotals.append(self.victims)
             Explorer.contador_instancias -= 1
             if(Explorer.contador_instancias == 0):
-                Explorer.victimsTotals.append(self.victims)
                 victims = {}
                 for i in Explorer.victimsTotals:
                     victims.update(i)
-                self.resc.make_groups_victims(Explorer.map, victims)
-                self.resc.go_save_victims(Explorer.map, victims)
-            else:
-                Explorer.victimsTotals.append(self.victims)
+                #self.resc.make_groups_victims(victims)
+                combinedMap = self.joinMaps(Explorer.maps)
+                self.resc.receive_map_victims(combinedMap, victims)
+            
             return False
 
         self.come_back()

@@ -26,6 +26,8 @@ class Cluster:
 
 ## Classe que define o Agente Rescuer com um plano fixo
 class Rescuer(AbstAgent):
+    rescuers = []
+
     def __init__(self, env, config_file):
         """ 
         @param env: a reference to an instance of the environment class
@@ -49,6 +51,7 @@ class Rescuer(AbstAgent):
         self.width = env.dic["GRID_WIDTH"]
         self.height = env.dic["GRID_HEIGHT"]
 
+        Rescuer.rescuers.append(self)
         # Starts in IDLE state.
         # It changes to ACTIVE when the map arrives
         self.set_state(VS.IDLE)
@@ -230,7 +233,7 @@ class Rescuer(AbstAgent):
 
         return True
 
-    def make_groups_victims(self, map, victims):
+    def make_groups_victims(self, victims):
         max_X = self.width
         max_Y = self.height
 
@@ -246,7 +249,7 @@ class Rescuer(AbstAgent):
         iters = 1
         MAX_ITERATIONS = 50
         while changedClusterPosition and iters < MAX_ITERATIONS:
-
+            changedClusterPosition = False
             for seq, ((x, y), vs) in victims.items():
                 dist = float('inf')
                 for j, elem in enumerate(self.clusters):
@@ -254,6 +257,8 @@ class Rescuer(AbstAgent):
                     if aux < dist:
                         dist = aux
                         clusterIndex = j
+                    if seq in elem.victims:
+                        del elem.victims[seq]
                 self.clusters[clusterIndex].victims[seq] = ((x, y), vs)
 
             for i in self.clusters:
@@ -269,7 +274,7 @@ class Rescuer(AbstAgent):
                     i.centroid.posX = sumX/len(i.victims)
                     i.centroid.posY = sumY/len(i.victims)
                     if auxCentroid == i.centroid:
-                        changedClusterPosition = False
+                        changedClusterPosition = True
             iters += 1
 
         for i, elem in enumerate(self.clusters):
@@ -283,3 +288,10 @@ class Rescuer(AbstAgent):
 
         for i in range(len(clustersCopy)):
             self.rescuers[i].cluster = clustersCopy[i]
+
+    def receive_map_victims(self, map, victims):
+        #self.assign_groups_to_rescuers()
+        self.make_groups_victims(victims)
+        
+        for i, rescuer in enumerate(Rescuer.rescuers):
+            rescuer.go_save_victims(map, self.clusters[i].victims)
