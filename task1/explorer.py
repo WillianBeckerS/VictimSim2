@@ -53,6 +53,8 @@ class Explorer(AbstAgent):
         Explorer.contador_instancias += 1
         super().__init__(env, config_file)
 
+        self.control = 0
+
         self.walk_stack = Stack()  # a stack to store the movements
         self.set_state(VS.ACTIVE)  # explorer is active since the begin
         self.resc = resc           # reference to the rescuer agent
@@ -209,7 +211,6 @@ class Explorer(AbstAgent):
             print(f"{self.NAME}: rtime {self.get_rtime()}, invoking the rescuer")
             print(f"{self.NAME}: rtime {self.get_rtime()}, instancias: " + str(Explorer.contador_instancias))
             #input(f"{self.NAME}: type [ENTER] to proceed")
-            
             Explorer.maps.append(self.map)
             Explorer.victimsTotals.append(self.victims)
             Explorer.contador_instancias -= 1
@@ -223,6 +224,10 @@ class Explorer(AbstAgent):
             
             return False
 
+        if(self.control == 0):
+            print("A* path: " + ' '.join(str(x) for x in self.astar((self.x, self.y), (0, 0))) )
+            self.control = 1
+
         self.come_back()
         return True
 
@@ -231,17 +236,24 @@ class Explorer(AbstAgent):
 
     def get_neighbors(self, node):
         neighbors = []
-        directions = [(0, -1), (1, -1), (1, 0), (0, 1), (-1, 1), (-1, 0), (-1, -1)]
-        obstacules = self.check_walls_and_lim()
-        for i, dx, dy in enumerate(directions):
+        directions = [(0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1)]
+        obstacules = self.check_walls_and_lim()        
+        print(' '.join(str(x) for x in obstacules))
+        i = 0
+        for dx, dy in directions:
             new_x, new_y = node.x + dx, node.y + dy
+            #obstacule = self.map.get((new_x, new_y))
+            #if obstacule != None:
+            #print("obstacules: " + str(obstacule[1]), end=" ")
             if obstacules[i] != VS.WALL and obstacules[i] != VS.END:
                 neighbors.append(Node(new_x, new_y, node))
+            i += 1
         return neighbors
 
-    def astar(self, map, start, end):
+    def astar(self, start, end):
         open_list = []
         closed_set = set()
+        print("start node: " + str(start[0]) + str(start[1]))
         start_node = Node(start[0], start[1])
         end_node = Node(end[0], end[1])
         heapq.heappush(open_list, start_node)
@@ -249,7 +261,7 @@ class Explorer(AbstAgent):
         while open_list:
             current_node = heapq.heappop(open_list)
             
-            if current_node == end_node:
+            if current_node.x == end_node.x and current_node.y == end_node.y:
                 path = []
                 while current_node:
                     path.append((current_node.x, current_node.y))
@@ -266,6 +278,8 @@ class Explorer(AbstAgent):
                 h_score = self.chebyshev(neighbor, end_node)
                 f_score = g_score + h_score
                 
+                #print("scores: " + str(g_score) + " " + str(h_score) + " " + str(f_score) )
+
                 if neighbor not in open_list or g_score < neighbor.g:
                     neighbor.g = g_score
                     neighbor.h = h_score
