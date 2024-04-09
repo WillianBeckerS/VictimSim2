@@ -293,5 +293,5 @@ class Rescuer(AbstAgent):
         #self.assign_groups_to_rescuers()
         self.make_groups_victims(victims)
         
-        for i, rescuer in enumerate(Rescuer.rescuers):
-            rescuer.go_save_victims(map, self.clusters[i].victims)
+        #for i, rescuer in enumerate(Rescuer.rescuers):
+            #rescuer.go_save_victims(map, self.clusters[i].victims)

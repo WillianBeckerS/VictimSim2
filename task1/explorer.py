@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from vs.abstract_agent import AbstAgent
 from vs.constants import VS
 from map import Map
+import heapq
 
 class Stack:
     def __init__(self):
@@ -26,6 +27,17 @@ class Stack:
 
     def is_empty(self):
         return len(self.items) == 0
+
+class Node:
+    def __init__(self, x, y, parent=None):
+        self.x = x
+        self.y = y
+        self.parent = parent
+        self.g = 0
+        self.h = 0
+    
+    def __lt__(self, other):
+        return (self.g + self.h) < (other.g + other.h)
 
 class Explorer(AbstAgent):
     contador_instancias = 0
@@ -213,3 +225,52 @@ class Explorer(AbstAgent):
 
         self.come_back()
         return True
+
+    def chebyshev(self, node, end_node):      # heuristica
+        return max(abs(node.x - end_node.x), abs(node.y - end_node.y))
+
+    def get_neighbors(self, node):
+        neighbors = []
+        directions = [(0, -1), (1, -1), (1, 0), (0, 1), (-1, 1), (-1, 0), (-1, -1)]
+        obstacules = self.check_walls_and_lim()
+        for i, dx, dy in enumerate(directions):
+            new_x, new_y = node.x + dx, node.y + dy
+            if obstacules[i] != VS.WALL and obstacules[i] != VS.END:
+                neighbors.append(Node(new_x, new_y, node))
+        return neighbors
+
+    def astar(self, map, start, end):
+        open_list = []
+        closed_set = set()
+        start_node = Node(start[0], start[1])
+        end_node = Node(end[0], end[1])
+        heapq.heappush(open_list, start_node)
+        
+        while open_list:
+            current_node = heapq.heappop(open_list)
+            
+            if current_node == end_node:
+                path = []
+                while current_node:
+                    path.append((current_node.x, current_node.y))
+                    current_node = current_node.parent
+                return path[::-1]
+            
+            closed_set.add((current_node.x, current_node.y))
+            
+            for neighbor in self.get_neighbors(current_node):
+                if neighbor in closed_set:
+                    continue
+                
+                g_score = current_node.g + 1
+                h_score = self.chebyshev(neighbor, end_node)
+                f_score = g_score + h_score
+                
+                if neighbor not in open_list or g_score < neighbor.g:
+                    neighbor.g = g_score
+                    neighbor.h = h_score
+                    neighbor.parent = current_node
+                    if neighbor not in open_list:
+                        heapq.heappush(open_list, neighbor)
+        
+        return None
