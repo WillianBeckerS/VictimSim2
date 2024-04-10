@@ -197,8 +197,9 @@ class Explorer(AbstAgent):
         for key, incr in Explorer.AC_INCR.items():
             if (obstacules[key] == VS.WALL or obstacules[key] == VS.END) and incr[0] == dx and incr[1] == dy:
                 self.map.add((self.x + dx, self.y + dy), VS.OBST_WALL, VS.NO_VICTIM, self.check_walls_and_lim())
-                self.path = Stack()
-                control = 0
+                self.path.items.clear()
+                self.control = 0
+                print("\n\n\nRECALCULANDO A*\n\n\n")
                 return
                 
         result = self.walk(dx, dy)
@@ -289,11 +290,15 @@ class Explorer(AbstAgent):
         heapq.heappush(open_list, start_node)
         
         while open_list:
+            #current_node = next((obj for obj in open_list if obj.x == 0 and obj.y == 0), None)
+
+            #if current_node is None:
             current_node = heapq.heappop(open_list)
             
             print("current node: " + str(current_node.x) + " x " + str(current_node.y))
             if current_node.x == end_node.x and current_node.y == end_node.y:
                 #path = []
+                print("TERMINANDO")
                 while current_node:
                     if(current_node.parent is not None):
                         self.path.push((current_node.x - current_node.parent.x, current_node.y - current_node.parent.y))
@@ -306,8 +311,12 @@ class Explorer(AbstAgent):
             closed_set.add((current_node.x, current_node.y))
             
             for neighbor in self.get_neighbors(current_node):
-                if neighbor in closed_set:
+                aux = next((obj for obj in closed_set if obj[0] == neighbor.x and obj[1] == neighbor.y), None)
+                if aux is not None:	# testar
                     continue
+                
+                #if neighbor in closed_set:
+                    #continue
                 
                 g_score = current_node.g + 1
                 h_score = self.chebyshev(neighbor, end_node)
