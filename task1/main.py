@@ -22,16 +22,16 @@ def main(data_folder_name):
     
     # Instantiate agents rescuer and explorer
     resc1 = Rescuer(env, rescuer_file)
-    resc2 = Rescuer(env, rescuer_file)
-    resc3 = Rescuer(env, rescuer_file)
-    resc4 = Rescuer(env, rescuer_file)
+    #resc2 = Rescuer(env, rescuer_file)
+    #resc3 = Rescuer(env, rescuer_file)
+    #resc4 = Rescuer(env, rescuer_file)
 
     # Explorer needs to know rescuer to send the map
     # that's why rescuer is instatiated before
     exp1 = Explorer(env, explorer_file, resc1)
-    exp2 = Explorer(env, explorer_file, resc1)
-    exp3 = Explorer(env, explorer_file, resc1)
-    exp4 = Explorer(env, explorer_file, resc1)
+    #exp2 = Explorer(env, explorer_file, resc1)
+    #exp3 = Explorer(env, explorer_file, resc1)
+    #exp4 = Explorer(env, explorer_file, resc1)
 
     print("INSTANCIAS:"+str(Explorer.contador_instancias))
     # Run the environment simulator

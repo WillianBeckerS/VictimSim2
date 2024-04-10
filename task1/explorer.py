@@ -44,6 +44,7 @@ class Explorer(AbstAgent):
     victimsTotals = []
     maps = []
 
+
     def __init__(self, env, config_file, resc):
         """ Construtor do agente random on-line
         @param env: a reference to the environment 
@@ -53,7 +54,14 @@ class Explorer(AbstAgent):
         Explorer.contador_instancias += 1
         super().__init__(env, config_file)
 
+        self.open_list = []
+        self.closed_set = set()
+        self.base_node = Node(0, 0)
+
         self.control = 0
+        self.desempilhando = 0
+        self.flagPop = 0
+        self.current_node = Node(0,0)
 
         self.walk_stack = Stack()  # a stack to store the movements
         self.set_state(VS.ACTIVE)  # explorer is active since the begin
@@ -225,10 +233,14 @@ class Explorer(AbstAgent):
             return False
 
         if(self.control == 0):
-            print("A* path: " + ' '.join(str(x) for x in self.astar((self.x, self.y), (0, 0))) )
+            #print("A* path: " + ' '.join(str(x) for x in self.astar((self.x, self.y), (0, 0))) )
+            start_node = Node(self.x, self.y)
+            print("celula inicial: " + str(start_node.x) + " " + str(start_node.y))
+            heapq.heappush(self.open_list, start_node)
             self.control = 1
 
-        self.come_back()
+        self.astar()
+        #self.come_back()
         return True
 
     def chebyshev(self, node, end_node):      # heuristica
@@ -236,55 +248,99 @@ class Explorer(AbstAgent):
 
     def get_neighbors(self, node):
         neighbors = []
-        directions = [(0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1)]
+        #directions = [(0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1)]
         obstacules = self.check_walls_and_lim()        
         print(' '.join(str(x) for x in obstacules))
-        i = 0
-        for dx, dy in directions:
-            new_x, new_y = node.x + dx, node.y + dy
-            #obstacule = self.map.get((new_x, new_y))
-            #if obstacule != None:
-            #print("obstacules: " + str(obstacule[1]), end=" ")
-            if obstacules[i] != VS.WALL and obstacules[i] != VS.END:
+        #i = 0
+        for key, incr in Explorer.AC_INCR.items():
+            new_x, new_y = node.x + incr[0], node.y + incr[1]
+
+            print("new node: " + str(new_x) + " " + str(new_y))
+            if obstacules[key] != VS.WALL and obstacules[key] != VS.END:
+                print("obstacules aceitos: " + str(obstacules[key]))
                 neighbors.append(Node(new_x, new_y, node))
-            i += 1
         return neighbors
 
-    def astar(self, start, end):
-        open_list = []
-        closed_set = set()
-        print("start node: " + str(start[0]) + str(start[1]))
-        start_node = Node(start[0], start[1])
-        end_node = Node(end[0], end[1])
-        heapq.heappush(open_list, start_node)
-        
-        while open_list:
-            current_node = heapq.heappop(open_list)
-            
-            if current_node.x == end_node.x and current_node.y == end_node.y:
-                path = []
-                while current_node:
-                    path.append((current_node.x, current_node.y))
-                    current_node = current_node.parent
-                return path[::-1]
-            
-            closed_set.add((current_node.x, current_node.y))
-            
-            for neighbor in self.get_neighbors(current_node):
-                if neighbor in closed_set:
-                    continue
-                
-                g_score = current_node.g + 1
-                h_score = self.chebyshev(neighbor, end_node)
-                f_score = g_score + h_score
-                
-                #print("scores: " + str(g_score) + " " + str(h_score) + " " + str(f_score) )
+    def adjc(self, c1, c2):
+        x1, y1 = c1
+        x2, y2 = c2
 
-                if neighbor not in open_list or g_score < neighbor.g:
-                    neighbor.g = g_score
-                    neighbor.h = h_score
-                    neighbor.parent = current_node
-                    if neighbor not in open_list:
-                        heapq.heappush(open_list, neighbor)
+        # Verifica se as coordenadas estão adjacentes em termos de distância Manhattan
+        if abs(x1 - x2) <= 1 and abs(y1 - y2) <= 1:
+            return True
+        else:
+            return False
+
+    def astar(self):
+        if len(self.open_list) != 0:
+            for i in self.open_list:
+                print(str(i.x) + " x " + str(i.y) + " - ")
+
+            if self.desempilhando == 0:
+                if self.flagPop != 1:
+                    self.current_node = heapq.heappop(self.open_list)
+                else:    
+                    self.flagPop = 0
+
+                print("current node: " + str(self.current_node.x) + " x " + str(self.current_node.y))
+                if(self.adjc((self.x, self.y), (self.current_node.x, self.current_node.y))):
+                    dx = self.current_node.x - self.x
+                    dy = self.current_node.y - self.y
+                    print(str(dx) + " x " + str(dy))
+                    print("no atual: " + str(self.x) + " " + str(self.y))
+                    self.walk(dx, dy)
+                    # update the position
+                    self.x += dx
+                    self.y += dy 
+                    self.walk_stack.push((dx, dy))
+
+                    if self.current_node.x == self.base_node.x and self.current_node.y == self.base_node.y:
+                        return  # chegou na base
+                    
+                    self.closed_set.add((self.current_node.x, self.current_node.y))
+                    
+                    for neighbor in self.get_neighbors(self.current_node):
+                        if neighbor in self.closed_set:
+                            continue
+                        
+                        g_score = self.current_node.g + 1
+                        h_score = self.chebyshev(neighbor, self.base_node)
+                        #f_score = g_score + h_score
+                        
+                        #print("scores: " + str(g_score) + " " + str(h_score) + " " + str(f_score) )
+                        neighbor.g = g_score
+                        neighbor.h = h_score
+                        neighbor.parent = self.current_node
+
+                        aux = next((obj for obj in self.open_list if obj.x == neighbor.x and obj.y == neighbor.y), None)
+
+                        if aux is not None:
+                            if neighbor.g < aux.g:
+                                aux.g = neighbor.g
+                                aux.h = neighbor.h
+                                aux.parent = neighbor.parent
+                        else:
+                            print("inserindo open_list...")
+                            heapq.heappush(self.open_list, neighbor)
+                else:
+                    self.desempilhando = 1
+            else:
+                print("desempilhando...")
+
+                dx, dy = self.walk_stack.pop()
+                dx = dx * -1
+                dy = dy * -1
+
+                self.walk(dx, dy)
+
+                # update the agent's position relative to the origin
+                self.x += dx
+                self.y += dy 
+
+                if(self.adjc((self.x, self.y), (self.current_node.x, self.current_node.y))):
+                    self.desempilhando = 0
+                    self.flagPop = 1
+        else:
+            print("There is no path...")
         
         return None
