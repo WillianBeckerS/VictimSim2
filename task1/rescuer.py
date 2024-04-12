@@ -65,7 +65,7 @@ class Rescuer(AbstAgent):
         print(f"\n\n*** R E S C U E R ***")
         self.map = map
         print(f"{self.NAME} Map received from the explorer")
-        self.map.draw()
+        #self.map.draw()
 
         print()
         #print(f"{self.NAME} List of found victims received from the explorer")
@@ -87,7 +87,7 @@ class Rescuer(AbstAgent):
         for a in self.plan:
             self.plan_x += a[0]
             self.plan_y += a[1]
-            print(f"{self.NAME} {i}) dxy=({a[0]}, {a[1]}) vic: a[2] => at({self.plan_x}, {self.plan_y})")
+            #print(f"{self.NAME} {i}) dxy=({a[0]}, {a[1]}) vic: a[2] => at({self.plan_x}, {self.plan_y})")
             i += 1
 
         print(f"{self.NAME} END OF PLAN")
@@ -247,7 +247,7 @@ class Rescuer(AbstAgent):
         changedClusterPosition = True
 		
         iters = 1
-        MAX_ITERATIONS = 50
+        MAX_ITERATIONS = 500
         while changedClusterPosition and iters < MAX_ITERATIONS:
             changedClusterPosition = False
             for seq, ((x, y), vs) in victims.items():
@@ -293,5 +293,59 @@ class Rescuer(AbstAgent):
         #self.assign_groups_to_rescuers()
         self.make_groups_victims(victims)
         
+        self.sum_of_squared_error()     # SSE analysis
+
+        self.silhouette_analysis()      # silhoutte analysis
+
         for i, rescuer in enumerate(Rescuer.rescuers):
             rescuer.go_save_victims(map, self.clusters[i].victims)
+
+    def sum_of_squared_error(self):
+        print("SSE analysis for the generated clusters")
+        for i, elem in enumerate(self.clusters):
+            SSE = 0   
+            for seq, ((x, y), vs) in elem.victims.items():
+                aux = math.sqrt(math.pow(x - elem.centroid.posX, 2) + math.pow(y - elem.centroid.posY, 2))
+                SSE += aux
+            print("SSE cluster" + str(i) + ": " + str(SSE))
+
+    def silhouette_analysis(self):
+
+        clustersAnalysis = []
+        for i, elem in enumerate(self.clusters):
+            if(len(elem.victims.items()) > 0):
+                clustersAnalysis.append(elem)
+
+        print("Silhouette analysis for the generated clusters")
+        for i, elem in enumerate(clustersAnalysis):
+            sumS = 0
+            for seq, ((x, y), vs) in elem.victims.items():
+                
+                # intracluster
+                sum = 0
+                for seq1, ((x1, y1), vs1) in elem.victims.items():
+                    if(seq != seq1):
+                        aux = math.sqrt(math.pow(x - x1, 2) + math.pow(y - y1, 2))
+                        sum += aux
+                averageIntraCluster = sum / len(elem.victims.items())
+                a = averageIntraCluster
+
+                # interclusters
+                averagesInterCluster = []
+                for j, elem2 in enumerate(clustersAnalysis):
+                    if(elem != elem2):
+                        sum = 0
+                        for seq1, ((x1, y1), vs1) in elem2.victims.items():
+                            aux = math.sqrt(math.pow(x - x1, 2) + math.pow(y - y1, 2))
+                            sum += aux
+                        average = sum / len(elem2.victims.items())
+                        averagesInterCluster.append(average)
+                b = min(averagesInterCluster) if averagesInterCluster else float('inf')
+
+                s = (b - a)/max(a, b)
+                
+                sumS += s
+
+            averageS = sumS / len(elem.victims.items())
+            print("Cluster" + str(i) + ": " + str(averageS))
+            continue

@@ -56,6 +56,8 @@ class Explorer(AbstAgent):
         self.control = 0
         self.path = Stack()
 
+        self.base = Node(env.dic["BASE"][0], env.dic["BASE"][1])
+        print(self.base.x, self.base.y)
         self.walk_stack = Stack()  # a stack to store the movements
         self.set_state(VS.ACTIVE)  # explorer is active since the begin
         self.resc = resc           # reference to the rescuer agent
@@ -68,6 +70,10 @@ class Explorer(AbstAgent):
         self.results = {}   # a dictionary of movement results: (i, j): (AC_INCR[n]: (l, c)), where 0 <= n <= 7
         self.untried = {} # a dictionary for untried movements
         self.unbacktracked = {} # a dictionary for saving unbacktracking
+
+        self.width = env.dic["GRID_WIDTH"]
+        self.height = env.dic["GRID_HEIGHT"]
+        print(self.width, self.height)
         
         # Put the current position - the base - in the map
         self.map.add((self.x, self.y), 1, VS.NO_VICTIM, self.check_walls_and_lim())
@@ -125,7 +131,9 @@ class Explorer(AbstAgent):
                 
         # Check if all movements was already tried
         if not self.untried[(self.x, self.y)]:
-            return self.unbacktracked[(self.x, self.y)].pop(0)
+            if self.unbacktracked[(self.x, self.y)]:
+                return self.unbacktracked[(self.x, self.y)].pop(0)
+            return random.choice([-1, 0, 1]), random.choice([-1, 0, 1])
 
     def explore(self):
         # get an random increment for x and y       
@@ -228,6 +236,11 @@ class Explorer(AbstAgent):
         if consumed_time < self.get_rtime():
             self.explore()
             return True
+        
+        '''heuristic = self.chebyshev(Node(self.x, self.y), Node(0, 0))
+        if self.get_rtime() > 100*heuristic:
+            self.explore()
+            return True'''
 
         # time to come back to the base
         if self.walk_stack.is_empty() or (self.x == 0 and self.y == 0):
@@ -249,14 +262,14 @@ class Explorer(AbstAgent):
             
             return False
 
-        if(self.control == 0):
+        '''if(self.control == 0):
             self.astar((self.x, self.y), (0, 0))
-            print("A* path: " + str(len(self.path.items)) + ' '.join(str(x) for x in self.path.items) )
+            #print("A* path: " + str(len(self.path.items)) + ' '.join(str(x) for x in self.path.items) )
             #for i in path:
                 #print("pop: " + str(path.pop()))
-            self.control = 1
+            self.control = 1'''
 
-        self.come_back_Astar()
+        self.come_back()
         return True
 
     def chebyshev(self, node, end_node):      # heuristica
@@ -271,20 +284,20 @@ class Explorer(AbstAgent):
         else:
             obstacules = [0, 0, 0, 0, 0, 0, 0, 0,]
 
-        print(' '.join(str(x) for x in obstacules))
+        #print(' '.join(str(x) for x in obstacules))
         for key, incr in Explorer.AC_INCR.items():
             new_x, new_y = node.x + incr[0], node.y + incr[1]
 
-            print("new node: " + str(new_x) + " " + str(new_y))
-            if obstacules[key] == 0 and new_x >= 0 and new_y >= 0:
-                print("obstacules aceitos: " + str(obstacules[key]))
+            #print("new node: " + str(new_x) + " " + str(new_y))
+            if obstacules[key] == 0 and new_x + self.base.x >= 0 and new_y + self.base.y >= 0 and new_x + self.base.x < self.width and new_y + self.base.y < self.height:
+                #print("obstacules aceitos: " + str(obstacules[key]))
                 neighbors.append(Node(new_x, new_y, node))
         return neighbors
 
     def astar(self, start, end):
         open_list = []
         closed_set = set()
-        print("start node: " + str(start[0]) + str(start[1]))
+        #print("start node: " + str(start[0]) + str(start[1]))
         start_node = Node(start[0], start[1])
         end_node = Node(end[0], end[1])
         heapq.heappush(open_list, start_node)
@@ -295,17 +308,17 @@ class Explorer(AbstAgent):
             #if current_node is None:
             current_node = heapq.heappop(open_list)
             
-            print("current node: " + str(current_node.x) + " x " + str(current_node.y))
+            #print("current node: " + str(current_node.x) + " x " + str(current_node.y))
             if current_node.x == end_node.x and current_node.y == end_node.y:
                 #path = []
-                print("TERMINANDO")
+                #print("TERMINANDO")
                 while current_node:
                     if(current_node.parent is not None):
                         self.path.push((current_node.x - current_node.parent.x, current_node.y - current_node.parent.y))
                     else:
                         self.path.push((0,0))
                     current_node = current_node.parent
-                print(str(self.path.pop()))
+                #print(str(self.path.pop()))
                 return
             
             closed_set.add((current_node.x, current_node.y))
@@ -332,9 +345,8 @@ class Explorer(AbstAgent):
                         aux.h = neighbor.h
                         aux.parent = neighbor.parent
                 else:
-                    print("inserindo open_list...")
+                    #print("inserindo open_list...")
                     heapq.heappush(open_list, neighbor)
-
 
                 '''if neighbor not in open_list or g_score < neighbor.g:
                     neighbor.g = g_score
