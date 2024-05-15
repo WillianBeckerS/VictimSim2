@@ -202,13 +202,13 @@ class Explorer(AbstAgent):
         dx, dy = self.path.pop()
 
         obstacules = self.check_walls_and_lim()
-        for key, incr in Explorer.AC_INCR.items():
+        '''for key, incr in Explorer.AC_INCR.items():
             if (obstacules[key] == VS.WALL or obstacules[key] == VS.END) and incr[0] == dx and incr[1] == dy:
                 self.map.add((self.x + dx, self.y + dy), VS.OBST_WALL, VS.NO_VICTIM, self.check_walls_and_lim())
                 self.path.items.clear()
                 self.control = 0
                 print("\n\n\nRECALCULANDO A*\n\n\n")
-                return
+                return'''
                 
         result = self.walk(dx, dy)
         if result == VS.BUMPED:
@@ -262,14 +262,14 @@ class Explorer(AbstAgent):
             
             return False
 
-        '''if(self.control == 0):
+        if(self.control == 0):
             self.astar((self.x, self.y), (0, 0))
-            #print("A* path: " + str(len(self.path.items)) + ' '.join(str(x) for x in self.path.items) )
+            print("A* path: " + str(len(self.path.items)) + ' '.join(str(x) for x in self.path.items) )
             #for i in path:
                 #print("pop: " + str(path.pop()))
-            self.control = 1'''
+            self.control = 1
 
-        self.come_back()
+        self.come_back_Astar()
         return True
 
     def chebyshev(self, node, end_node):      # heuristica
@@ -282,7 +282,7 @@ class Explorer(AbstAgent):
         if(item):
             obstacules = item[2]
         else:
-            obstacules = [0, 0, 0, 0, 0, 0, 0, 0,]
+            obstacules = [1, 1, 1, 1, 1, 1, 1, 1,]
 
         #print(' '.join(str(x) for x in obstacules))
         for key, incr in Explorer.AC_INCR.items():
