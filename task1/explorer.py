@@ -44,7 +44,7 @@ class Explorer(AbstAgent):
     victimsTotals = []
     maps = []
 
-    def __init__(self, env, config_file, resc):
+    def __init__(self, env, config_file, resc, id):
         """ Construtor do agente random on-line
         @param env: a reference to the environment 
         @param config_file: the absolute path to the explorer's config file
@@ -52,6 +52,8 @@ class Explorer(AbstAgent):
         """
         Explorer.contador_instancias += 1
         super().__init__(env, config_file)
+
+        self.id = id
 
         self.control = 0
         self.path = Stack()
@@ -149,7 +151,7 @@ class Explorer(AbstAgent):
         if result == VS.BUMPED:
             # update the map with the wall
             self.map.add((self.x + dx, self.y + dy), VS.OBST_WALL, VS.NO_VICTIM, self.check_walls_and_lim())
-            #print(f"{self.NAME}: Wall or grid limit reached at ({self.x + dx}, {self.y + dy})")
+            #print(f"{self.NAME} {self.id}: Wall or grid limit reached at ({self.x + dx}, {self.y + dy})")
 
         if result == VS.EXECUTED:
             # check for victim returns -1 if there is no victim or the sequential
@@ -165,8 +167,8 @@ class Explorer(AbstAgent):
             if seq != VS.NO_VICTIM:
                 vs = self.read_vital_signals()
                 self.victims[vs[0]] = ((self.x, self.y), vs)
-                print(f"{self.NAME} Victim found at ({self.x}, {self.y}), rtime: {self.get_rtime()}")
-                #print(f"{self.NAME} Seq: {seq} Vital signals: {vs}")
+                print(f"{self.NAME} {self.id} Victim found at ({self.x}, {self.y}), rtime: {self.get_rtime()}")
+                #print(f"{self.NAME} {self.id} Seq: {seq} Vital signals: {vs}")
             
             # Calculates the difficulty of the visited cell
             difficulty = (rtime_bef - rtime_aft)
@@ -177,7 +179,7 @@ class Explorer(AbstAgent):
 
             # Update the map with the new cell
             self.map.add((self.x, self.y), difficulty, seq, self.check_walls_and_lim())
-            #print(f"{self.NAME}:at ({self.x}, {self.y}), diffic: {difficulty:.2f} vict: {seq} rtime: {self.get_rtime()}")
+            #print(f"{self.NAME} {self.id}:at ({self.x}, {self.y}), diffic: {difficulty:.2f} vict: {seq} rtime: {self.get_rtime()}")
 
         return
 
@@ -188,14 +190,14 @@ class Explorer(AbstAgent):
 
         result = self.walk(dx, dy)
         if result == VS.BUMPED:
-            print(f"{self.NAME}: when coming back bumped at ({self.x+dx}, {self.y+dy}) , rtime: {self.get_rtime()}")
+            print(f"{self.NAME} {self.id}: when coming back bumped at ({self.x+dx}, {self.y+dy}) , rtime: {self.get_rtime()}")
             return
         
         if result == VS.EXECUTED:
             # update the agent's position relative to the origin
             self.x += dx
             self.y += dy
-            #print(f"{self.NAME}: coming back at ({self.x}, {self.y}), rtime: {self.get_rtime()}")
+            #print(f"{self.NAME} {self.id}: coming back at ({self.x}, {self.y}), rtime: {self.get_rtime()}")
 
     def come_back_Astar(self):
         
@@ -212,14 +214,14 @@ class Explorer(AbstAgent):
                 
         result = self.walk(dx, dy)
         if result == VS.BUMPED:
-            print(f"{self.NAME}: when coming back bumped at ({self.x+dx}, {self.y+dy}) , rtime: {self.get_rtime()}")
+            print(f"{self.NAME} {self.id}: when coming back bumped at ({self.x+dx}, {self.y+dy}) , rtime: {self.get_rtime()}")
             return
         
         if result == VS.EXECUTED:
             # update the agent's position relative to the origin
             self.x += dx
             self.y += dy
-            #print(f"{self.NAME}: coming back at ({self.x}, {self.y}), rtime: {self.get_rtime()}")
+            #print(f"{self.NAME} {self.id}: coming back at ({self.x}, {self.y}), rtime: {self.get_rtime()}")
 
     def joinMaps(self, maps):
         joinedMap = Map()
@@ -232,23 +234,23 @@ class Explorer(AbstAgent):
         """ The agent chooses the next action. The simulator calls this
         method at each cycle. Must be implemented in every agent"""
 
-        consumed_time = self.TLIM - self.get_rtime()
-        if consumed_time < self.get_rtime():
+        # consumed_time = self.TLIM - self.get_rtime()
+        # if consumed_time < self.get_rtime():
+        #     self.explore()
+        #     return True
+        
+        heuristic = self.chebyshev(Node(self.x, self.y), Node(0, 0))
+        if self.control == 0 and self.get_rtime() > 30*heuristic:
             self.explore()
             return True
-        
-        '''heuristic = self.chebyshev(Node(self.x, self.y), Node(0, 0))
-        if self.get_rtime() > 100*heuristic:
-            self.explore()
-            return True'''
 
         # time to come back to the base
         if self.walk_stack.is_empty() or (self.x == 0 and self.y == 0):
             # time to wake up the rescuer
             # pass the walls and the victims (here, they're empty)
-            print(f"{self.NAME}: rtime {self.get_rtime()}, invoking the rescuer")
-            print(f"{self.NAME}: rtime {self.get_rtime()}, instancias: " + str(Explorer.contador_instancias))
-            #input(f"{self.NAME}: type [ENTER] to proceed")
+            print(f"{self.NAME} {self.id}: rtime {self.get_rtime()}, invoking the rescuer")
+            print(f"{self.NAME} {self.id}: rtime {self.get_rtime()}, instancias: " + str(Explorer.contador_instancias))
+            #input(f"{self.NAME} {self.id}: type [ENTER] to proceed")
             Explorer.maps.append(self.map)
             Explorer.victimsTotals.append(self.victims)
             Explorer.contador_instancias -= 1
@@ -264,7 +266,7 @@ class Explorer(AbstAgent):
 
         if(self.control == 0):
             self.astar((self.x, self.y), (0, 0))
-            print("A* path: " + str(len(self.path.items)) + ' '.join(str(x) for x in self.path.items) )
+            print(f"{self.NAME} {self.id} A* path: " + str(len(self.path.items)) + ' '.join(str(x) for x in self.path.items) )
             #for i in path:
                 #print("pop: " + str(path.pop()))
             self.control = 1
