@@ -97,7 +97,6 @@ class Explorer(AbstAgent):
             # Check if the corresponding position in walls_and_lim is CLEAR
             if obstacles[direction] == VS.CLEAR:
                 return Explorer.AC_INCR[direction]
-        
     
     def online_dfs(self):
         """ Implements Online DFS to explore the environment
@@ -107,9 +106,19 @@ class Explorer(AbstAgent):
         obstacles = self.check_walls_and_lim()
 
         # A randomic sequence for moving
-        if (self.x, self.y) not in self.untried:
+        '''if (self.x, self.y) not in self.untried:
             self.untried[(self.x, self.y)] = list(range(8))
-            random.shuffle(self.untried[(self.x, self.y)])
+            random.shuffle(self.untried[(self.x, self.y)])'''
+
+        if (self.x, self.y) not in self.untried:
+            if self.id == 1:
+                self.untried[(self.x, self.y)] = [0, 7, 1, 4, 2, 3, 5, 6]
+            elif self.id == 2:
+                self.untried[(self.x, self.y)] = [2, 1, 3, 6, 4, 5, 0, 7]
+            elif self.id == 3:
+                self.untried[(self.x, self.y)] = [4, 3, 5, 0, 1, 2, 6, 7]
+            elif self.id == 4:
+                self.untried[(self.x, self.y)] = [6, 5, 7, 2, 3, 1, 4, 0]
 
         # Loop while untried list is not empty
         while self.untried[(self.x, self.y)]:
@@ -123,6 +132,9 @@ class Explorer(AbstAgent):
                 self.untried[(self.x, self.y)].pop(0)
             # Check if the corresponding position in walls_and_lim is CLEAR
             elif obstacles[self.untried[(self.x, self.y)][0]] == VS.CLEAR:
+                if (self.x + dx, self.y + dy) in self.untried:
+                    self.untried[(self.x, self.y)].pop(0)
+                    continue
                 # Save the movement result
                 self.results[(self.x, self.y)] = {(Explorer.AC_INCR[self.untried[(self.x, self.y)][0]]): (self.x + dx, self.y + dy)}
                 if (self.x, self.y) not in self.unbacktracked:
@@ -133,8 +145,9 @@ class Explorer(AbstAgent):
                 
         # Check if all movements was already tried
         if not self.untried[(self.x, self.y)]:
-            if self.unbacktracked[(self.x, self.y)]:
-                return self.unbacktracked[(self.x, self.y)].pop(0)
+            if (self.x, self.y) in self.unbacktracked:
+                if self.unbacktracked[(self.x, self.y)]:
+                    return self.unbacktracked[(self.x, self.y)].pop(0)
             return random.choice([-1, 0, 1]), random.choice([-1, 0, 1])
 
     def explore(self):
