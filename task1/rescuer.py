@@ -273,7 +273,7 @@ class Rescuer(AbstAgent):
                 if(len(i.victims) != 0):                
                     i.centroid.posX = sumX/len(i.victims)
                     i.centroid.posY = sumY/len(i.victims)
-                    if auxCentroid == i.centroid:
+                    if round(auxCentroid.posX, 1) != round(i.centroid.posX, 1) or round(auxCentroid.posY, 1) != round(i.centroid.posY, 1):
                         changedClusterPosition = True
             iters += 1
 

@@ -253,7 +253,7 @@ class Explorer(AbstAgent):
         #     return True
         
         heuristic = self.chebyshev(Node(self.x, self.y), Node(0, 0))
-        if self.control == 0 and self.get_rtime() > 30*heuristic:
+        if self.control == 0 and self.get_rtime() > 4*heuristic:
             self.explore()
             return True
 
