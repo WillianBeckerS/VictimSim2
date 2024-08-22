@@ -279,6 +279,7 @@ class Explorer(AbstAgent):
 
         if(self.control == 0):
             self.astar((self.x, self.y), (0, 0))
+            print("Astar: de (" + str(self.x) + ", " + str(self.y) + ") a ...")
             print(f"{self.NAME} {self.id} A* path: " + str(len(self.path.items)) + ' '.join(str(x) for x in self.path.items) )
             #for i in path:
                 #print("pop: " + str(path.pop()))

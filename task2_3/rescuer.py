@@ -50,6 +50,8 @@ class Rescuer(AbstAgent):
 
         self.width = env.dic["GRID_WIDTH"]
         self.height = env.dic["GRID_HEIGHT"]
+        self.baseX = env.dic["BASE"][0]
+        self.baseY = env.dic["BASE"][1]
 
         Rescuer.rescuers.append(self)
         # Starts in IDLE state.
@@ -236,10 +238,11 @@ class Rescuer(AbstAgent):
     def make_groups_victims(self, victims):
         max_X = self.width
         max_Y = self.height
+        print(str(self.width) + str(self.height))
 
         for i in range(4):
-            x = random.randint(1, max_X)
-            y = random.randint(1, max_Y)
+            x = random.randint(1, max_X) - self.baseX
+            y = random.randint(1, max_Y) - self.baseY
             print("posicao cluster: " + str(x) + " " + str(y))
             cluster = Cluster(x, y)
             self.clusters.append(cluster)
