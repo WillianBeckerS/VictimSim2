@@ -13,31 +13,7 @@ from vs.abstract_agent import AbstAgent
 from vs.constants import VS
 from map import Map
 import heapq
-
-class Stack:
-    def __init__(self):
-        self.items = []
-
-    def push(self, item):
-        self.items.append(item)
-
-    def pop(self):
-        if not self.is_empty():
-            return self.items.pop()
-
-    def is_empty(self):
-        return len(self.items) == 0
-
-class Node:
-    def __init__(self, x, y, parent=None):
-        self.x = x
-        self.y = y
-        self.parent = parent
-        self.g = 0
-        self.h = 0
-    
-    def __lt__(self, other):
-        return (self.g + self.h) < (other.g + other.h)
+from utilities import Stack, Node
 
 class Explorer(AbstAgent):
     contador_instancias = 0
@@ -253,7 +229,7 @@ class Explorer(AbstAgent):
         #     return True
         
         heuristic = self.chebyshev(Node(self.x, self.y), Node(0, 0))
-        if self.control == 0 and self.get_rtime() > 4*heuristic:
+        if self.control == 0 and self.get_rtime() > 5600:#4*heuristic:
             self.explore()
             return True
 

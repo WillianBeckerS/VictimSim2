@@ -13,6 +13,9 @@ from vs.abstract_agent import AbstAgent
 from vs.physical_agent import PhysAgent
 from vs.constants import VS
 from abc import ABC, abstractmethod
+from utilities import Stack, Node
+import itertools
+import heapq
 
 class Centroid:
     def __init__(self, posX, posY):
@@ -52,13 +55,14 @@ class Rescuer(AbstAgent):
         self.height = env.dic["GRID_HEIGHT"]
         self.baseX = env.dic["BASE"][0]
         self.baseY = env.dic["BASE"][1]
+        self.base = Node(env.dic["BASE"][0], env.dic["BASE"][1])
 
         Rescuer.rescuers.append(self)
         # Starts in IDLE state.
         # It changes to ACTIVE when the map arrives
         self.set_state(VS.IDLE)
+        self.path = Stack()
 
-    
     def go_save_victims(self, map, victims):
         """ The explorer sends the map containing the walls and
         victims' location. The rescuer becomes ACTIVE. From now,
@@ -69,10 +73,11 @@ class Rescuer(AbstAgent):
         print(f"{self.NAME} Map received from the explorer")
         #self.map.draw()
 
-        print()
+        print('VITICMS: ')
         #print(f"{self.NAME} List of found victims received from the explorer")
         self.victims = victims
-
+        for seq, ((x, y), vs) in self.victims.items():
+            print(f"({seq}): (({x},{y}), {vs})")
         # print the found victims - you may comment out
         #for seq, data in self.victims.items():
         #    coord, vital_signals = data
@@ -89,7 +94,7 @@ class Rescuer(AbstAgent):
         for a in self.plan:
             self.plan_x += a[0]
             self.plan_y += a[1]
-            #print(f"{self.NAME} {i}) dxy=({a[0]}, {a[1]}) vic: a[2] => at({self.plan_x}, {self.plan_y})")
+            print(f"{self.NAME} {i}) dxy=({a[0]}, {a[1]}) vic: a[2] => at({self.plan_x}, {self.plan_y})")
             i += 1
 
         print(f"{self.NAME} END OF PLAN")
@@ -179,7 +184,52 @@ class Rescuer(AbstAgent):
         # This is a off-line trajectory plan, each element of the list is a pair dx, dy that do the agent walk in the x-axis and/or y-axis.
         # Besides, it has a flag indicating that a first-aid kit must be delivered when the move is completed.
         # For instance (0,1,True) means the agent walk to (x+0,y+1) and after walking, it leaves the kit.
+        
+        first_victim = next(iter(self.victims.items()))
+        self.astar((0, 0), (first_victim[1][0]))
 
+        while self.path.is_empty() == False:
+            dx, dy = self.path.pop()
+            self.plan.append((dx, dy, False)) # walk only 
+
+        #print("Astar: de (" + str(self.x) + ", " + str(self.y) + ") a ...")
+        #print(f"{self.NAME} {self.id} A* path: " + str(len(self.path.items)) + ' '.join(str(x) for x in self.path.items) )
+            
+        for seq, ((x, y), vs) in self.victims.items():
+            print(f"({seq}): (({x},{y}), {vs})")      
+
+        iterador_atual, iterador_proximo = itertools.tee(self.victims.items())
+        next(iterador_proximo, None)  # Avança o segundo iterador para o segundo elemento
+
+        # Itera e imprime o atual e o próximo
+        for atual, proximo in zip(iterador_atual, iterador_proximo):
+            self.astar(atual[1][0], proximo[1][0])
+            while self.path.is_empty() == False:
+                dx, dy = self.path.pop()
+                self.plan.append((dx, dy, False)) # walk only 
+            print(f"Atual: {atual}, Próximo: {proximo}")
+            
+        ultima_chave, ultimo_valor = list(self.victims.items())[-1]
+        #ultimo_elemento = next(iterador_proximo, None)
+        #if ultimo_elemento:
+        #    print(f"Último elemento: {ultimo_elemento}")
+
+        self.astar((ultimo_valor[0][0], ultimo_valor[0][1]), (0, 0))
+        while self.path.is_empty() == False:
+            dx, dy = self.path.pop()
+            self.plan.append((dx, dy, False)) # walk only 
+
+        '''
+        aux = Stack()
+        while self.plan.is_empty() == False:
+            dx, dy = self.path.pop()
+            aux.push((dx, dy))
+
+        while aux.is_empty() == False:
+            dx, dy = aux.pop()
+            self.plan.append((dx, dy, False)) # walk only '''
+
+        ''' old planner
         self.plan_visited.add((0,0)) # always start from the base, so it is already visited
         difficulty, vic_seq, actions_res = self.map.get((0,0))
         self.__depth_search(actions_res)
@@ -195,8 +245,8 @@ class Rescuer(AbstAgent):
             come_back_plan.append((a[0]*-1, a[1]*-1, False))
 
         self.plan = self.plan + come_back_plan
-        
-        
+        '''
+
     def deliberate(self) -> bool:
         """ This is the choice of the next action. The simulator calls this
         method at each reasonning cycle if the agent is ACTIVE.
@@ -352,3 +402,90 @@ class Rescuer(AbstAgent):
             averageS = sumS / len(elem.victims.items())
             print("Cluster" + str(i) + ": " + str(averageS))
             continue
+    
+    # COLOCAR ASTAR EM LUGAR QUE EXPLORER E RESCUER POSSAM USAR O MESMO
+
+    def chebyshev(self, node, end_node):      # heuristica
+        return max(abs(node.x - end_node.x), abs(node.y - end_node.y))
+
+    def get_neighbors(self, node):
+        neighbors = []        
+        
+        item = self.map.get((node.x, node.y))
+        if(item):
+            obstacules = item[2]
+        else:
+            obstacules = [1, 1, 1, 1, 1, 1, 1, 1,]
+
+        #print(' '.join(str(x) for x in obstacules))
+        for key, incr in Rescuer.AC_INCR.items():
+            new_x, new_y = node.x + incr[0], node.y + incr[1]
+
+            #print("new node: " + str(new_x) + " " + str(new_y))
+            if obstacules[key] == 0 and new_x + self.base.x >= 0 and new_y + self.base.y >= 0 and new_x + self.base.x < self.width and new_y + self.base.y < self.height:
+                #print("obstacules aceitos: " + str(obstacules[key]))
+                neighbors.append(Node(new_x, new_y, node))
+        return neighbors
+
+    def astar(self, start, end):
+        open_list = []
+        closed_set = set()
+        #print("start node: " + str(start[0]) + str(start[1]))
+        start_node = Node(start[0], start[1])
+        end_node = Node(end[0], end[1])
+        heapq.heappush(open_list, start_node)
+        
+        while open_list:
+            #current_node = next((obj for obj in open_list if obj.x == 0 and obj.y == 0), None)
+
+            #if current_node is None:
+            current_node = heapq.heappop(open_list)
+            
+            #print("current node: " + str(current_node.x) + " x " + str(current_node.y))
+            if current_node.x == end_node.x and current_node.y == end_node.y:
+                #path = []
+                #print("TERMINANDO")
+                while current_node:
+                    if(current_node.parent is not None):
+                        self.path.push((current_node.x - current_node.parent.x, current_node.y - current_node.parent.y))
+                    else:
+                        self.path.push((0,0))
+                    current_node = current_node.parent
+                #print(str(self.path.pop()))
+                return
+            
+            closed_set.add((current_node.x, current_node.y))
+            
+            for neighbor in self.get_neighbors(current_node):
+                aux = next((obj for obj in closed_set if obj[0] == neighbor.x and obj[1] == neighbor.y), None)
+                if aux is not None:	# testar
+                    continue
+                
+                #if neighbor in closed_set:
+                    #continue
+                
+                g_score = current_node.g + 1
+                h_score = self.chebyshev(neighbor, end_node)
+                f_score = g_score + h_score
+                
+                #print("scores: " + str(g_score) + " " + str(h_score) + " " + str(f_score) )
+
+                aux = next((obj for obj in open_list if obj.x == neighbor.x and obj.y == neighbor.y), None)
+
+                if aux is not None:
+                    if neighbor.g < aux.g:
+                        aux.g = neighbor.g
+                        aux.h = neighbor.h
+                        aux.parent = neighbor.parent
+                else:
+                    #print("inserindo open_list...")
+                    heapq.heappush(open_list, neighbor)
+
+                '''if neighbor not in open_list or g_score < neighbor.g:
+                    neighbor.g = g_score
+                    neighbor.h = h_score
+                    neighbor.parent = current_node
+                    if neighbor not in open_list:
+                        heapq.heappush(open_list, neighbor)'''
+        
+        return None
