@@ -30,6 +30,9 @@ class Cluster:
 ## Classe que define o Agente Rescuer com um plano fixo
 class Rescuer(AbstAgent):
     rescuers = []
+    population_size = 100
+    generations = 500
+    mutation_rate = 0.01
 
     def __init__(self, env, config_file):
         """ 
@@ -184,13 +187,41 @@ class Rescuer(AbstAgent):
         # This is a off-line trajectory plan, each element of the list is a pair dx, dy that do the agent walk in the x-axis and/or y-axis.
         # Besides, it has a flag indicating that a first-aid kit must be delivered when the move is completed.
         # For instance (0,1,True) means the agent walk to (x+0,y+1) and after walking, it leaves the kit.
+
+        population = self.__initialize_population()
+
+        print(f'POPULAAA{population}')
+
+        for _ in range(Rescuer.generations):
+            fitness_scores = [self.__evaluate_fitness(individual) for individual in population]
+            selected_individuals = self.__selection(population, fitness_scores)
+            next_population = []
+
+            while len(next_population) < Rescuer.population_size:
+                parent1 = random.choice(selected_individuals)
+                parent2 = random.choice(selected_individuals)
+                child1, child2 = self.__crossover(parent1, parent2)
+                next_population.append(self.__mutate(child1, Rescuer.mutation_rate))
+                next_population.append(self.__mutate(child2, Rescuer.mutation_rate))
+
+            population = next_population
+
+        best_individual = max(population, key=self.__evaluate_fitness)
+
+        print(f'best plan: {best_individual}')
         
+        # Calcular A* de best_individual para ver se é possível completar a rota no tempo limite
+        # Caso não seja possível, remover este indivíduo de population e repitir best_individual = max(population, key=self.__evaluate_fitness)
+
+        # Ordenando self.victims de acordo com a sequencia devolvida pelo AG
+        self.victims = {key: self.victims[key] for key in best_individual if key in self.victims}
+        print(f'VICCCC{self.victims.items()}')
         first_victim = next(iter(self.victims.items()))
         self.astar((0, 0), (first_victim[1][0]))
 
         while self.path.is_empty() == False:
             dx, dy = self.path.pop()
-            self.plan.append((dx, dy, False)) # walk only 
+            self.plan.append((dx, dy, False)) # walk only
 
         #print("Astar: de (" + str(self.x) + ", " + str(self.y) + ") a ...")
         #print(f"{self.NAME} {self.id} A* path: " + str(len(self.path.items)) + ' '.join(str(x) for x in self.path.items) )
@@ -246,6 +277,137 @@ class Rescuer(AbstAgent):
 
         self.plan = self.plan + come_back_plan
         '''
+
+    def __initialize_population(self):
+        population = []
+        individual = []
+
+        # Population initialize based on the rescuer cluster
+        print(self.clusters[0].victims.items())
+        for seq, ((x, y), vs) in self.clusters[0].victims.items():
+            individual.append(seq)
+
+        print(f'individual rescuer: {individual}')
+
+        # Gerar todas as permutações de tamanho 1 até len(individual)
+        all_permutations = []
+        max_permutations = 5
+        for r in range(1, len(individual) + 1):
+            # Misturar as sequências para evitar padrões
+            random.shuffle(individual)
+            # Limitar o número de permutações geradas para cada r
+            limited_permutations = itertools.islice(itertools.permutations(individual, r), max_permutations)
+            all_permutations.extend(list(limited_permutations))
+
+        print(f'all_permutations: {all_permutations}')
+
+        if len(all_permutations) < Rescuer.population_size:
+            population = [list(p) for p in random.sample(all_permutations, len(all_permutations))]
+        else:
+            # Selecionar aleatoriamente Rescuer.population_size permutações para criar a população
+            population = [list(p) for p in random.sample(all_permutations, Rescuer.population_size)]
+
+        print(f'POPULATION (rescuer): {population}')
+
+        return population
+    
+    def __evaluate_fitness(self, plan):
+        """
+        Evaluates the fitness of a plan based on the time spent and the severity of rescued victims.
+        @param plan: list of planned actions
+        @return fitness: fitness value of the plan
+        """
+
+        total_severity = 0
+        total_distance = 0
+        current_x, current_y = 0, 0
+
+        for elem in plan:
+            for seq, ((x, y), vs) in self.clusters[0].victims.items():
+                target_x, target_y = x, y
+                if elem == seq:
+                    # Pegar os sinais vitais de cada vítima e passar pra rede neural
+                    #total_severity += rede_neural(vs[1], vs[2], vs[3])
+                    total_severity += random.randint(1, 4)
+                    # Soma distancia euclidiana total de passar por todas as vitimas
+                    total_distance += self.__euclidean_distance(current_x, current_y, target_x, target_y)
+                    current_x, current_y = target_x, target_y
+                    break
+                
+        # Somar distancia para voltar até a base
+        total_distance += self.__euclidean_distance(current_x, current_y, 0, 0)
+
+        # Calculate the fitness value considering the euclidean distance and the severity of rescued victims
+        if total_distance != 0:
+            fitness = total_severity / total_distance
+        else:
+            fitness = total_severity
+        
+        return fitness
+    
+    def __euclidean_distance(self, x1, y1, x2, y2):
+        return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+    
+    def __selection(self, population, fitness_scores):
+        # Ensure fitness scores are not all zero
+        total_fitness = sum(fitness_scores)
+        
+        if total_fitness == 0:
+            # If all fitness scores are zero, assign equal probability to each individual
+            fitness_scores = [1] * len(population)
+
+        selected = random.choices(population, weights=fitness_scores, k=len(population) // 2)
+        return selected
+
+    def __crossover(self, parent1, parent2):
+        if len(parent1) > 1 and len(parent2) > 1:
+            # Determine o tamanho mínimo e máximo entre os pais
+            min_size = min(len(parent1), len(parent2))
+            max_size = max(len(parent1), len(parent2))
+            
+            # Gerar dois pontos de corte aleatórios baseados no menor tamanho
+            cut1 = random.randint(0, min_size - 1)
+            cut2 = random.randint(cut1 + 1, min_size)
+            
+            # Criar filhos com o tamanho do pai correspondente
+            child1 = [-1] * len(parent1)
+            child2 = [-1] * len(parent2)
+            
+            # Copiar segmento dos pais para os filhos
+            child1[cut1:cut2] = parent1[cut1:cut2]
+            child2[cut1:cut2] = parent2[cut1:cut2]
+            
+            # Função para preencher os filhos com os genes restantes
+            def fill_child(child, parent):
+                current_pos = cut2
+                for gene in parent:
+                    if gene not in child:
+                        while current_pos < len(child) and child[current_pos] != -1:
+                            current_pos += 1
+                        if current_pos >= len(child):
+                            current_pos = 0
+                        while current_pos < len(child) - 1 and child[current_pos] != -1:
+                            current_pos += 1
+                        child[current_pos] = gene
+                        current_pos += 1  # Incrementa current_pos após adicionar o gene
+
+            fill_child(child1, parent2)
+            fill_child(child2, parent1)
+            
+            return child1, child2
+        
+        return parent1, parent2
+    
+    def __mutate(self, individual, mutation_rate):
+        '''if random.random() < mutation_rate:
+            mutation_index1 = random.randint(0, len(individual) - 1)
+            mutation_index2 = mutation_index1
+            while mutation_index2 == mutation_index1:
+                mutation_index2 = random.randint(0, len(individual) - 1)
+            aux = individual[mutation_index1]
+            individual[mutation_index1] = individual[mutation_index2]
+            individual[mutation_index2] = aux'''
+        return individual
 
     def deliberate(self) -> bool:
         """ This is the choice of the next action. The simulator calls this
