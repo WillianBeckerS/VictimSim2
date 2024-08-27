@@ -16,6 +16,10 @@ from abc import ABC, abstractmethod
 from utilities import Stack, Node
 import itertools
 import heapq
+import numpy as np
+from tflite_runtime.interpreter import Interpreter
+from sklearn.preprocessing import StandardScaler
+import joblib
 
 class Centroid:
     def __init__(self, posX, posY):
@@ -65,6 +69,46 @@ class Rescuer(AbstAgent):
         # It changes to ACTIVE when the map arrives
         self.set_state(VS.IDLE)
         self.path = Stack()
+        self.load_neural_model()
+
+    def load_neural_model(self):    # pip install tflite-runtime
+        # 1. Carregar o modelo TFLite
+        self.interpreter = Interpreter(model_path='model2.tflite')
+        self.interpreter.allocate_tensors()
+
+        # 2. Obter detalhes dos tensores de entrada e saída
+        self.input_details = self.interpreter.get_input_details()
+        self.output_details = self.interpreter.get_output_details()
+
+        # 3. Carregar o scaler usado durante o treinamento
+        self.scaler = joblib.load('scaler_vitimas.pkl')
+
+    def prediction(self, qPB, pulse, respRate):
+        # 4. Definir os valores da nova entrada
+        # Exemplo: qualidade da pressão arterial=2, pulso=75, frequência respiratória=20
+        new_data = np.array([[qPB,pulse,respRate]])
+
+        # 5. Normalizar a entrada usando o scaler carregado
+        new_data_normalized = self.scaler.transform(new_data)
+
+        # 6. Fazer a previsão
+        self.interpreter.set_tensor(self.input_details[0]['index'], new_data_normalized.astype(np.float32))
+        self.interpreter.invoke()
+
+        # 7. Obter a previsão
+        output_data = self.interpreter.get_tensor(self.output_details[0]['index'])
+        predicted_class = np.argmax(output_data, axis=1)[0] + 1
+
+        if predicted_class == 1:
+            fitness_value = 4
+        elif predicted_class == 2:
+            fitness_value = 3
+        elif predicted_class == 3:
+            fitness_value = 2
+        else:
+            fitness_value = 1
+
+        return fitness_value
 
     def go_save_victims(self, map, victims):
         """ The explorer sends the map containing the walls and
@@ -327,8 +371,8 @@ class Rescuer(AbstAgent):
                 target_x, target_y = x, y
                 if elem == seq:
                     # Pegar os sinais vitais de cada vítima e passar pra rede neural
-                    #total_severity += rede_neural(vs[1], vs[2], vs[3])
-                    total_severity += random.randint(1, 4)
+                    total_severity += self.prediction(vs[2], vs[3], vs[4]) # CONFERIR
+                    #total_severity += random.randint(1, 4)
                     # Soma distancia euclidiana total de passar por todas as vitimas
                     total_distance += self.__euclidean_distance(current_x, current_y, target_x, target_y)
                     current_x, current_y = target_x, target_y
