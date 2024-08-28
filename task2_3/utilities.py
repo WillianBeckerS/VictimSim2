@@ -22,3 +22,13 @@ class Node:
     
     def __lt__(self, other):
         return (self.g + self.h) < (other.g + other.h)
+    
+class Centroid:
+    def __init__(self, posX, posY):
+        self.posX = posX
+        self.posY = posY
+
+class Cluster:
+    def __init__(self, posX, posY):
+        self.centroid = Centroid(posX, posY)
+        self.victims = {} # a dictionary of found victims: (seq): ((x,y), [<vs>])
