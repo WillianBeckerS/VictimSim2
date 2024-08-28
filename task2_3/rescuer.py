@@ -64,6 +64,7 @@ class Rescuer(AbstAgent):
         self.baseY = env.dic["BASE"][1]
         self.base = Node(env.dic["BASE"][0], env.dic["BASE"][1])
 
+        self.dir_clusters = './clusters'
         Rescuer.rescuers.append(self)
         # Starts in IDLE state.
         # It changes to ACTIVE when the map arrives
@@ -264,8 +265,8 @@ class Rescuer(AbstAgent):
         self.astar((0, 0), (first_victim[1][0]))
 
         while self.path.is_empty() == False:
-            dx, dy = self.path.pop()
-            self.plan.append((dx, dy, False)) # walk only
+            dx, dy, vict = self.path.pop()
+            self.plan.append((dx, dy, vict)) 
 
         #print("Astar: de (" + str(self.x) + ", " + str(self.y) + ") a ...")
         #print(f"{self.NAME} {self.id} A* path: " + str(len(self.path.items)) + ' '.join(str(x) for x in self.path.items) )
@@ -280,8 +281,8 @@ class Rescuer(AbstAgent):
         for atual, proximo in zip(iterador_atual, iterador_proximo):
             self.astar(atual[1][0], proximo[1][0])
             while self.path.is_empty() == False:
-                dx, dy = self.path.pop()
-                self.plan.append((dx, dy, False)) # walk only 
+                dx, dy, vict = self.path.pop()
+                self.plan.append((dx, dy, vict)) 
             print(f"Atual: {atual}, Próximo: {proximo}")
             
         ultima_chave, ultimo_valor = list(self.victims.items())[-1]
@@ -291,7 +292,7 @@ class Rescuer(AbstAgent):
 
         self.astar((ultimo_valor[0][0], ultimo_valor[0][1]), (0, 0))
         while self.path.is_empty() == False:
-            dx, dy = self.path.pop()
+            dx, dy, vict = self.path.pop()
             self.plan.append((dx, dy, False)) # walk only 
 
         '''
@@ -537,9 +538,9 @@ class Rescuer(AbstAgent):
             iters += 1
 
         for i, elem in enumerate(self.clusters):
-            with open('cluster' + str(i) + '.txt', 'w') as arquivo:
+            with open(os.path.join(self.dir_clusters, 'cluster' + str(i) + '.txt'), 'w') as arquivo:
                 for seq, ((x, y), vs) in elem.victims.items():
-                    arquivo.write(str(seq) + "," + str(x) + "," + str(y) + "," + str(vs[0]) + "," + str(vs[1]) + "," + str(vs[2]) + "," + str(vs[3]) + "," + str(vs[4]) + "," + str(vs[4]) + "\n")
+                    arquivo.write(str(seq) + "," + str(x) + "," + str(y) + "," + str(vs[1]) + "," + str(vs[2]) + "," + str(vs[3]) + "," + str(vs[4]) + "," + str(vs[5]) + "\n")
                             
     def assign_groups_to_rescuers(self):
         clustersCopy = self.clusters
@@ -651,11 +652,16 @@ class Rescuer(AbstAgent):
             if current_node.x == end_node.x and current_node.y == end_node.y:
                 #path = []
                 #print("TERMINANDO")
+                #primeiro fora do laco pois tratasse do incremento que levara a uma vitima
+                if(current_node.parent is not None):
+                    self.path.push((current_node.x - current_node.parent.x, current_node.y - current_node.parent.y, True))
+                current_node = current_node.parent
+
                 while current_node:
                     if(current_node.parent is not None):
-                        self.path.push((current_node.x - current_node.parent.x, current_node.y - current_node.parent.y))
+                        self.path.push((current_node.x - current_node.parent.x, current_node.y - current_node.parent.y, False))
                     else:
-                        self.path.push((0,0))
+                        self.path.push((0, 0, False))
                     current_node = current_node.parent
                 #print(str(self.path.pop()))
                 return
