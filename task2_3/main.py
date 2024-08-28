@@ -22,9 +22,9 @@ def main(data_folder_name):
     
     # Instantiate agents rescuer and explorer
     resc1 = Rescuer(env, rescuer_file)
-    #resc2 = Rescuer(env, rescuer_file)
-    #resc3 = Rescuer(env, rescuer_file)
-    #resc4 = Rescuer(env, rescuer_file)
+    resc2 = Rescuer(env, rescuer_file)
+    resc3 = Rescuer(env, rescuer_file)
+    resc4 = Rescuer(env, rescuer_file)
 
     # Explorer needs to know rescuer to send the map
     # that's why rescuer is instatiated before
@@ -45,6 +45,6 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         data_folder_name = sys.argv[1]
     else:
-        data_folder_name = os.path.join("datasets", "data_42v_20x20") # data_300v_90x90
+        data_folder_name = os.path.join("datasets", "data_132v_100x80") # data_300v_90x90
         
     main(data_folder_name)

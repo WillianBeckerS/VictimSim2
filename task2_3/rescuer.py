@@ -17,7 +17,7 @@ from utilities import Stack, Node, Centroid, Cluster
 import itertools
 import heapq
 import numpy as np
-from tflite_runtime.interpreter import Interpreter
+import tensorflow as tf
 from sklearn.preprocessing import StandardScaler
 import joblib
 
@@ -25,7 +25,7 @@ import joblib
 class Rescuer(AbstAgent):
     rescuers = []
     population_size = 100
-    generations = 500
+    generations = 300
     mutation_rate = 0.01
 
     def __init__(self, env, config_file):
@@ -47,6 +47,7 @@ class Rescuer(AbstAgent):
         self.x = 0                  # the current x position of the rescuer when executing the plan
         self.y = 0                  # the current y position of the rescuer when executing the plan
         self.clusters = []    # list of clusters
+        self.cluster = None
 
         self.width = env.dic["GRID_WIDTH"]
         self.height = env.dic["GRID_HEIGHT"]
@@ -66,7 +67,7 @@ class Rescuer(AbstAgent):
 
     def load_neural_model(self):    # pip install tflite-runtime
         # 1. Carregar o modelo TFLite
-        self.interpreter = Interpreter(model_path='model2.tflite')
+        self.interpreter = tf.lite.Interpreter(model_path='model2.tflite')
         self.interpreter.allocate_tensors()
 
         # 2. Obter detalhes dos tensores de entrada e saída
@@ -105,7 +106,7 @@ class Rescuer(AbstAgent):
 
     ''' route planning and rescuer activation '''
 
-    def go_save_victims(self, map, victims):
+    def go_save_victims(self, map, cluster):
         """ The explorer sends the map containing the walls and
         victims' location. The rescuer becomes ACTIVE. From now,
         the deliberate method is called by the environment"""
@@ -117,7 +118,8 @@ class Rescuer(AbstAgent):
 
         print('VITICMS: ')
         #print(f"{self.NAME} List of found victims received from the explorer")
-        self.victims = victims
+        self.victims = cluster.victims
+        self.cluster = cluster
         for seq, ((x, y), vs) in self.victims.items():
             print(f"({seq}): (({x},{y}), {vs})")
         # print the found victims - you may comment out
@@ -159,9 +161,10 @@ class Rescuer(AbstAgent):
 
         population = self.__initialize_population()
 
-        print(f'POPULAAA{population}')
+        #print(f'POPULAAA{population}')
 
-        for _ in range(Rescuer.generations):
+        for i in range(Rescuer.generations):
+            print(f'Generation: {i}')
             fitness_scores = [self.__evaluate_fitness(individual) for individual in population]
             selected_individuals = self.__selection(population, fitness_scores)
             next_population = []
@@ -184,7 +187,7 @@ class Rescuer(AbstAgent):
 
         # Ordenando self.victims de acordo com a sequencia devolvida pelo AG
         self.victims = {key: self.victims[key] for key in best_individual if key in self.victims}
-        print(f'VICCCC{self.victims.items()}')
+        #print(f'VICCCC{self.victims.items()}')
         first_victim = next(iter(self.victims.items()))
         self.astar((0, 0), (first_victim[1][0]))
 
@@ -236,11 +239,11 @@ class Rescuer(AbstAgent):
         individual = []
 
         # Population initialize based on the rescuer cluster
-        print(self.clusters[0].victims.items())
-        for seq, ((x, y), vs) in self.clusters[0].victims.items():
+        print(self.cluster.victims.items())
+        for seq, ((x, y), vs) in self.cluster.victims.items():
             individual.append(seq)
 
-        print(f'individual rescuer: {individual}')
+        #print(f'individual rescuer: {individual}')
 
         # Gerar todas as permutações de tamanho 1 até len(individual)
         all_permutations = []
@@ -252,7 +255,7 @@ class Rescuer(AbstAgent):
             limited_permutations = itertools.islice(itertools.permutations(individual, r), max_permutations)
             all_permutations.extend(list(limited_permutations))
 
-        print(f'all_permutations: {all_permutations}')
+        #print(f'all_permutations: {all_permutations}')
 
         if len(all_permutations) < Rescuer.population_size:
             population = [list(p) for p in random.sample(all_permutations, len(all_permutations))]
@@ -260,7 +263,7 @@ class Rescuer(AbstAgent):
             # Selecionar aleatoriamente Rescuer.population_size permutações para criar a população
             population = [list(p) for p in random.sample(all_permutations, Rescuer.population_size)]
 
-        print(f'POPULATION (rescuer): {population}')
+        #print(f'POPULATION (rescuer): {population}')
 
         return population
     
@@ -276,7 +279,7 @@ class Rescuer(AbstAgent):
         current_x, current_y = 0, 0
 
         for elem in plan:
-            for seq, ((x, y), vs) in self.clusters[0].victims.items():
+            for seq, ((x, y), vs) in self.cluster.victims.items():
                 target_x, target_y = x, y
                 if elem == seq:
                     # Pegar os sinais vitais de cada vítima e passar pra rede neural
@@ -352,14 +355,17 @@ class Rescuer(AbstAgent):
         return parent1, parent2
     
     def __mutate(self, individual, mutation_rate):
-        '''if random.random() < mutation_rate:
-            mutation_index1 = random.randint(0, len(individual) - 1)
-            mutation_index2 = mutation_index1
-            while mutation_index2 == mutation_index1:
-                mutation_index2 = random.randint(0, len(individual) - 1)
-            aux = individual[mutation_index1]
-            individual[mutation_index1] = individual[mutation_index2]
-            individual[mutation_index2] = aux'''
+        if len(individual) < 2:
+            # Se a lista tem menos de 2 elementos, retorna sem mutar
+            return individual
+        
+        if random.random() < mutation_rate:
+            # Seleciona dois índices diferentes aleatoriamente
+            mutation_index1, mutation_index2 = random.sample(range(len(individual)), 2)
+            
+            # Troca os elementos nos índices selecionados
+            individual[mutation_index1], individual[mutation_index2] = individual[mutation_index2], individual[mutation_index1]
+            
         return individual
 
     ''' This is the choice of the next action '''
@@ -470,7 +476,7 @@ class Rescuer(AbstAgent):
         self.silhouette_analysis()      # silhoutte analysis
 
         for i, rescuer in enumerate(Rescuer.rescuers):
-            rescuer.go_save_victims(map, self.clusters[i].victims)
+            rescuer.go_save_victims(map, self.clusters[i])
 
     def sum_of_squared_error(self):
         print("SSE analysis for the generated clusters")
