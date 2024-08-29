@@ -229,7 +229,7 @@ class Explorer(AbstAgent):
         #     return True
         
         heuristic = self.chebyshev(Node(self.x, self.y), Node(0, 0))
-        if self.control == 0 and self.get_rtime() > 4*heuristic:
+        if self.control == 0 and self.get_rtime() > 6*heuristic:
             self.explore()
             return True
 
@@ -255,6 +255,9 @@ class Explorer(AbstAgent):
 
         if(self.control == 0):
             self.astar((self.x, self.y), (0, 0))
+            while(len(self.path.items) == 0):
+                self.astar((self.x, self.y), (0, 0))
+            print(f"{self.x} x {self.y}")
             print(f"{self.NAME} {self.id} A* path: " + str(len(self.path.items)) + ' '.join(str(x) for x in self.path.items) )
             #for i in path:
                 #print("pop: " + str(path.pop()))
@@ -265,6 +268,9 @@ class Explorer(AbstAgent):
 
     def chebyshev(self, node, end_node):      # heuristica
         return max(abs(node.x - end_node.x), abs(node.y - end_node.y))
+
+    def euclidean(self, node1, node2):         # heuristica
+        return math.sqrt((node1.x - node2.x) ** 2 + (node1.y - node2.y) ** 2)
 
     def get_neighbors(self, node):
         neighbors = []        
@@ -323,7 +329,7 @@ class Explorer(AbstAgent):
                     #continue
                 
                 g_score = current_node.g + 1
-                h_score = self.chebyshev(neighbor, end_node)
+                h_score = self.euclidean(neighbor, end_node)
                 f_score = g_score + h_score
                 
                 #print("scores: " + str(g_score) + " " + str(h_score) + " " + str(f_score) )

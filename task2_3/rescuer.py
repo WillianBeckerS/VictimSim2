@@ -25,7 +25,7 @@ import joblib
 class Rescuer(AbstAgent):
     rescuers = []
     population_size = 100
-    generations = 300
+    generations = 50
     mutation_rate = 0.01
 
     def __init__(self, env, config_file):
@@ -38,6 +38,7 @@ class Rescuer(AbstAgent):
         # Specific initialization for the rescuer
         self.map = None             # explorer will pass the map
         self.victims = None         # list of found victims
+        self.seq = {}               # dictionary with data to make the 'seq.txt' archives (seq): ((x, y), 0, gravity_class)
         self.plan = []              # a list of planned actions
         self.plan_x = 0             # the x position of the rescuer during the planning phase
         self.plan_y = 0             # the y position of the rescuer during the planning phase
@@ -48,6 +49,7 @@ class Rescuer(AbstAgent):
         self.y = 0                  # the current y position of the rescuer when executing the plan
         self.clusters = []    # list of clusters
         self.cluster = None
+        self.best_individual = []  # Best individual selected by AG
 
         self.width = env.dic["GRID_WIDTH"]
         self.height = env.dic["GRID_HEIGHT"]
@@ -57,6 +59,7 @@ class Rescuer(AbstAgent):
 
         self.dir_clusters = './clusters'
         Rescuer.rescuers.append(self)
+        self.id = len(Rescuer.rescuers) - 1
         # Starts in IDLE state.
         # It changes to ACTIVE when the map arrives
         self.set_state(VS.IDLE)
@@ -66,38 +69,34 @@ class Rescuer(AbstAgent):
     ''' neural network loading and prediction method '''
 
     def load_neural_model(self):    # pip install tflite-runtime
-        # 1. Carregar o modelo TFLite
-        self.interpreter = tf.lite.Interpreter(model_path='model2.tflite')
-        self.interpreter.allocate_tensors()
+        # Carregar o modelo salvo
+        self.model = tf.keras.models.load_model('modelo_classificacao_vitimas_cross_validation.h5')
 
-        # 2. Obter detalhes dos tensores de entrada e saída
-        self.input_details = self.interpreter.get_input_details()
-        self.output_details = self.interpreter.get_output_details()
-
-        # 3. Carregar o scaler usado durante o treinamento
+        # Carregar o scaler salvo
         self.scaler = joblib.load('scaler_vitimas.pkl')
 
-    def prediction(self, qPB, pulse, respRate):
-        # 4. Definir os valores da nova entrada
-        # Exemplo: qualidade da pressão arterial=2, pulso=75, frequência respiratória=20
-        new_data = np.array([[qPB,pulse,respRate]])
+    def prediction(self, victim_id, qPB, pulse, respRate):
+        input_data = np.array([[qPB, pulse, respRate]])
 
-        # 5. Normalizar a entrada usando o scaler carregado
-        new_data_normalized = self.scaler.transform(new_data)
+        # Normalizar os dados de entrada usando o scaler
+        input_data_normalized = self.scaler.transform(input_data)
 
-        # 6. Fazer a previsão
-        self.interpreter.set_tensor(self.input_details[0]['index'], new_data_normalized.astype(np.float32))
-        self.interpreter.invoke()
+        # Fazer a previsão usando os dados normalizados
+        predictions = self.model.predict(input_data_normalized)
 
-        # 7. Obter a previsão
-        output_data = self.interpreter.get_tensor(self.output_details[0]['index'])
-        predicted_class = np.argmax(output_data, axis=1)[0] + 1
+        # Obter as classes previstas
+        predicted_classes = np.argmax(predictions, axis=1) + 1  # Ajuste para classes 1-4
 
-        if predicted_class == 1:
+        # Mostrar as classes previstas
+        #print("Predicted classes:", predicted_classes[0])
+        
+        self.seq[victim_id] = predicted_classes[0]
+
+        if predicted_classes == 1:
             fitness_value = 4
-        elif predicted_class == 2:
+        elif predicted_classes == 2:
             fitness_value = 3
-        elif predicted_class == 3:
+        elif predicted_classes == 3:
             fitness_value = 2
         else:
             fitness_value = 1
@@ -105,6 +104,26 @@ class Rescuer(AbstAgent):
         return fitness_value
 
     ''' route planning and rescuer activation '''
+
+    def make_seq_data(self):
+        deletes = []
+        for i in self.seq:
+            predicted_class = self.seq[i]
+            if i in self.victims:
+                self.seq[i] = (self.victims[i][0], 0, predicted_class)
+            else:
+                deletes.append(i)
+
+        for i in deletes:
+            del self.seq[i]
+
+        self.seq = {key: self.seq[key] for key in self.best_individual if key in self.seq}
+        print(f'SEQ DATA: {self.seq}')
+
+        with open(os.path.join(self.dir_clusters, 'seq' + str(self.id) + '.txt'), 'w') as arquivo:
+            for seq, ((x, y), grav, gclass) in self.seq.items():
+                arquivo.write(str(seq) + "," + str(x) + "," + str(y) + "," + str(grav) + "," + str(gclass) + "\n")
+                 
 
     def go_save_victims(self, map, cluster):
         """ The explorer sends the map containing the walls and
@@ -178,15 +197,16 @@ class Rescuer(AbstAgent):
 
             population = next_population
 
-        best_individual = max(population, key=self.__evaluate_fitness)
+        self.best_individual = max(population, key=self.__evaluate_fitness)
 
-        print(f'best plan: {best_individual}')
+        print(f'best plan: {self.best_individual}')
         
         # Calcular A* de best_individual para ver se é possível completar a rota no tempo limite
         # Caso não seja possível, remover este indivíduo de population e repitir best_individual = max(population, key=self.__evaluate_fitness)
 
         # Ordenando self.victims de acordo com a sequencia devolvida pelo AG
-        self.victims = {key: self.victims[key] for key in best_individual if key in self.victims}
+        self.victims = {key: self.victims[key] for key in self.best_individual if key in self.victims}
+        self.make_seq_data()
         #print(f'VICCCC{self.victims.items()}')
         first_victim = next(iter(self.victims.items()))
         self.astar((0, 0), (first_victim[1][0]))
@@ -242,7 +262,8 @@ class Rescuer(AbstAgent):
         print(self.cluster.victims.items())
         for seq, ((x, y), vs) in self.cluster.victims.items():
             individual.append(seq)
-
+            self.prediction(seq, vs[3], vs[4], vs[5]) # CONFERIR
+        
         #print(f'individual rescuer: {individual}')
 
         # Gerar todas as permutações de tamanho 1 até len(individual)
@@ -263,7 +284,7 @@ class Rescuer(AbstAgent):
             # Selecionar aleatoriamente Rescuer.population_size permutações para criar a população
             population = [list(p) for p in random.sample(all_permutations, Rescuer.population_size)]
 
-        #print(f'POPULATION (rescuer): {population}')
+        print(f'POPULATION (rescuer {self.id}): {population}')
 
         return population
     
@@ -276,6 +297,7 @@ class Rescuer(AbstAgent):
 
         total_severity = 0
         total_distance = 0
+        total_difficulty = 0
         current_x, current_y = 0, 0
 
         for elem in plan:
@@ -283,36 +305,57 @@ class Rescuer(AbstAgent):
                 target_x, target_y = x, y
                 if elem == seq:
                     # Pegar os sinais vitais de cada vítima e passar pra rede neural
-                    total_severity += self.prediction(vs[2], vs[3], vs[4]) # CONFERIR
+                    if self.seq[seq] == 1:
+                        total_severity += 4
+                    elif self.seq[seq] == 2:
+                        total_severity += 3
+                    elif self.seq[seq] == 3:
+                        total_severity += 2
+                    elif self.seq[seq] == 4:
+                        total_severity += 1 
                     #total_severity += random.randint(1, 4)
                     # Soma distancia euclidiana total de passar por todas as vitimas
-                    total_distance += self.__euclidean_distance(current_x, current_y, target_x, target_y)
+                    map_pos = self.map.get((x, y))
+                    total_difficulty += map_pos[0]
+                    total_distance += self.chebyshev(Node(current_x, current_y), Node(target_x, target_y))
                     current_x, current_y = target_x, target_y
                     break
-                
+
         # Somar distancia para voltar até a base
-        total_distance += self.__euclidean_distance(current_x, current_y, 0, 0)
+        total_distance += self.chebyshev(Node(current_x, current_y), Node(0, 0))
+
+        # Aproximação tomando 2 como média de dificuldade de célula
+        total_difficulty += self.COST_LINE * (total_distance) + self.COST_DIAG * (total_distance) - 2*len(plan) + len(plan)*self.COST_FIRST_AID
+
+        if(self.plan_rtime < total_difficulty or total_difficulty < 2*self.plan_rtime):
+            return 0
 
         # Calculate the fitness value considering the euclidean distance and the severity of rescued victims
-        if total_distance != 0:
-            fitness = total_severity / total_distance
+        if total_difficulty != 0:
+            fitness = total_severity / total_difficulty
         else:
             fitness = total_severity
         
         return fitness
     
-    def __euclidean_distance(self, x1, y1, x2, y2):
-        return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-    
     def __selection(self, population, fitness_scores):
         # Ensure fitness scores are not all zero
         total_fitness = sum(fitness_scores)
+        print(f'FITNESS {population}')
         
         if total_fitness == 0:
             # If all fitness scores are zero, assign equal probability to each individual
             fitness_scores = [1] * len(population)
+            total_fitness = sum(fitness_scores)
 
-        selected = random.choices(population, weights=fitness_scores, k=len(population) // 2)
+        probabilities = [score / total_fitness for score in fitness_scores]
+
+        indices = list(range(len(population)))
+
+        selected = np.random.choice(indices, size=len(indices) // 2, replace=False, p=probabilities)
+
+        selected = [population[i] for i in indices]
+
         return selected
 
     def __crossover(self, parent1, parent2):
@@ -346,6 +389,17 @@ class Rescuer(AbstAgent):
                             current_pos += 1
                         child[current_pos] = gene
                         current_pos += 1  # Incrementa current_pos após adicionar o gene
+                
+                already_in = set(child) - {-1}
+
+                # Itera sobre a nova lista para substituir os -1
+                for i in range(len(child)):
+                    if child[i] == -1:
+                        for item in parent1 + parent2:  # Junta as duas listas para buscar elementos
+                            if item not in already_in:
+                                child[i] = item
+                                already_in.add(item)
+                                break  # Pare de procurar assim que encontrar o elemento
 
             fill_child(child1, parent2)
             fill_child(child2, parent1)
@@ -532,6 +586,9 @@ class Rescuer(AbstAgent):
 
     def chebyshev(self, node, end_node):      # heuristica
         return max(abs(node.x - end_node.x), abs(node.y - end_node.y))
+    
+    def euclidean(self, node1, node2):         # heuristica
+        return math.sqrt((node1.x - node2.x) ** 2 + (node1.y - node2.y) ** 2)
 
     def get_neighbors(self, node):
         neighbors = []        
@@ -547,7 +604,7 @@ class Rescuer(AbstAgent):
             new_x, new_y = node.x + incr[0], node.y + incr[1]
 
             #print("new node: " + str(new_x) + " " + str(new_y))
-            if obstacules[key] == 0 and new_x + self.base.x >= 0 and new_y + self.base.y >= 0 and new_x + self.base.x < self.width and new_y + self.base.y < self.height:
+            if obstacules[key] == 0: #and new_x + self.base.x >= 0 and new_y + self.base.y >= 0 and new_x + self.base.x < self.width and new_y + self.base.y < self.height:
                 #print("obstacules aceitos: " + str(obstacules[key]))
                 neighbors.append(Node(new_x, new_y, node))
         return neighbors
@@ -595,7 +652,7 @@ class Rescuer(AbstAgent):
                     #continue
                 
                 g_score = current_node.g + 1
-                h_score = self.chebyshev(neighbor, end_node)
+                h_score = self.euclidean(neighbor, end_node)
                 f_score = g_score + h_score
                 
                 #print("scores: " + str(g_score) + " " + str(h_score) + " " + str(f_score) )
