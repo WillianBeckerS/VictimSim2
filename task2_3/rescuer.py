@@ -25,8 +25,8 @@ import joblib
 class Rescuer(AbstAgent):
     rescuers = []
     population_size = 100
-    generations = 50
-    mutation_rate = 0.01
+    generations = 100
+    mutation_rate = 0.03
 
     def __init__(self, env, config_file):
         """ 
@@ -118,7 +118,7 @@ class Rescuer(AbstAgent):
             del self.seq[i]
 
         self.seq = {key: self.seq[key] for key in self.best_individual if key in self.seq}
-        print(f'SEQ DATA: {self.seq}')
+        #print(f'SEQ DATA: {self.seq}')
 
         with open(os.path.join(self.dir_clusters, 'seq' + str(self.id) + '.txt'), 'w') as arquivo:
             for seq, ((x, y), grav, gclass) in self.seq.items():
@@ -135,7 +135,7 @@ class Rescuer(AbstAgent):
         print(f"{self.NAME} Map received from the explorer")
         #self.map.draw()
 
-        print('VITICMS: ')
+        #print('VITICMS: ')
         #print(f"{self.NAME} List of found victims received from the explorer")
         self.victims = cluster.victims
         self.cluster = cluster
@@ -183,7 +183,7 @@ class Rescuer(AbstAgent):
         #print(f'POPULAAA{population}')
 
         for i in range(Rescuer.generations):
-            print(f'Generation: {i}')
+            #print(f'Generation: {i}')
             fitness_scores = [self.__evaluate_fitness(individual) for individual in population]
             selected_individuals = self.__selection(population, fitness_scores)
             next_population = []
@@ -259,7 +259,7 @@ class Rescuer(AbstAgent):
         individual = []
 
         # Population initialize based on the rescuer cluster
-        print(self.cluster.victims.items())
+        #print(self.cluster.victims.items())
         for seq, ((x, y), vs) in self.cluster.victims.items():
             individual.append(seq)
             self.prediction(seq, vs[3], vs[4], vs[5]) # CONFERIR
@@ -268,7 +268,7 @@ class Rescuer(AbstAgent):
 
         # Gerar todas as permutações de tamanho 1 até len(individual)
         all_permutations = []
-        max_permutations = 5
+        max_permutations = 10
         for r in range(1, len(individual) + 1):
             # Misturar as sequências para evitar padrões
             random.shuffle(individual)
@@ -284,7 +284,7 @@ class Rescuer(AbstAgent):
             # Selecionar aleatoriamente Rescuer.population_size permutações para criar a população
             population = [list(p) for p in random.sample(all_permutations, Rescuer.population_size)]
 
-        print(f'POPULATION (rescuer {self.id}): {population}')
+        #print(f'POPULATION (rescuer {self.id}): {population}')
 
         return population
     
@@ -327,7 +327,7 @@ class Rescuer(AbstAgent):
         # Aproximação tomando 2 como média de dificuldade de célula
         total_difficulty += self.COST_LINE * (total_distance) + self.COST_DIAG * (total_distance) - 2*len(plan) + len(plan)*self.COST_FIRST_AID
 
-        if(self.plan_rtime < total_difficulty or total_difficulty < 2*self.plan_rtime):
+        if(2*self.plan_rtime < total_difficulty or total_difficulty < 2*self.plan_rtime or len(plan < 5)):
             return 0
 
         # Calculate the fitness value considering the euclidean distance and the severity of rescued victims
@@ -341,7 +341,7 @@ class Rescuer(AbstAgent):
     def __selection(self, population, fitness_scores):
         # Ensure fitness scores are not all zero
         total_fitness = sum(fitness_scores)
-        print(f'FITNESS {population}')
+        #print(f'FITNESS {population}')
         
         if total_fitness == 0:
             # If all fitness scores are zero, assign equal probability to each individual
